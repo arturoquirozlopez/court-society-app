@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -5,9 +7,7 @@ const nextConfig = {
     serverActions: { bodySizeLimit: "6mb" }, // accommodates avatar uploads
   },
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "*.supabase.co" },
-    ],
+    remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
   },
   async headers() {
     return [
@@ -27,4 +27,18 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Wrap with Sentry. Safe to ship without SENTRY_AUTH_TOKEN — source map upload
+ * just gets skipped (errors still report, just without symbolicated stack traces).
+ * When you set SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT in Vercel,
+ * source maps upload automatically on every deploy.
+ */
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  hideSourceMaps: true,
+  disableLogger: true,
+  tunnelRoute: "/monitoring",
+});
