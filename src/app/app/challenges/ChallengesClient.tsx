@@ -242,42 +242,71 @@ export function ChallengesClient({
               )}
 
               {accepted && (
-                <div className="mt-3 px-4 py-3 bg-cs-green text-cs-ivory flex items-start gap-2.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cs-brassLight mt-1" />
-                  <div>
-                    <div className="text-[12px] text-cs-brassLight font-medium tracking-[0.04em]">
-                      Match accepted{ch.accepted_by === meId
-                        ? " by you"
-                        : acceptor
-                          ? ` by ${acceptor.full_name}`
-                          : ""}
+                <div className="mt-3 px-4 py-3 bg-cs-green text-cs-ivory">
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cs-brassLight mt-1" />
+                    <div className="flex-1">
+                      <div className="text-[12px] text-cs-brassLight font-medium tracking-[0.04em]">
+                        Match accepted{ch.accepted_by === meId
+                          ? " by you"
+                          : acceptor
+                            ? ` by ${acceptor.full_name}`
+                            : ""}
+                      </div>
+                      <div className="text-[10px] text-cs-ivory/55 mt-1">
+                        Arrange whenever — no time limit. Log the result from H2H when you&rsquo;ve played.
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2.5">
+                        {acceptor?.whatsapp && (
+                          <a
+                            href={waLink(
+                              acceptor.whatsapp,
+                              `Hi ${acceptor.full_name?.split(" ")[0]}! Accepted your Court Society challenge.`,
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white text-[10px] tracking-wider uppercase"
+                          >
+                            💬 WhatsApp {acceptor.full_name?.split(" ")[0]}
+                          </a>
+                        )}
+                        {ch.accepted_by === meId && author?.whatsapp && (
+                          <a
+                            href={waLink(
+                              author.whatsapp,
+                              `Hi ${author.full_name?.split(" ")[0]}! I accepted your Court Society challenge.`,
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white text-[10px] tracking-wider uppercase"
+                          >
+                            💬 WhatsApp {author.full_name?.split(" ")[0]}
+                          </a>
+                        )}
+                        <Link
+                          href="/app/h2h"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cs-brass text-cs-green text-[10px] tracking-wider uppercase"
+                        >
+                          Log result →
+                        </Link>
+                      </div>
                     </div>
-                    {acceptor?.whatsapp && (
-                      <a
-                        href={waLink(
-                          acceptor.whatsapp,
-                          `Hi ${acceptor.full_name?.split(" ")[0]}! Accepted your Court Society challenge.`,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 mt-2 bg-[#25D366] text-white text-[10px] tracking-wider uppercase"
-                      >
-                        💬 WhatsApp {acceptor.full_name?.split(" ")[0]}
-                      </a>
-                    )}
-                    {ch.accepted_by === meId && author?.whatsapp && (
-                      <a
-                        href={waLink(
-                          author.whatsapp,
-                          `Hi ${author.full_name?.split(" ")[0]}! I accepted your Court Society challenge.`,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 mt-2 bg-[#25D366] text-white text-[10px] tracking-wider uppercase"
-                      >
-                        💬 WhatsApp {author.full_name?.split(" ")[0]}
-                      </a>
-                    )}
+                  </div>
+                  <div className="border-t border-cs-ivory/15 mt-3 pt-2 text-right">
+                    <button
+                      disabled={pending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Cancel this accepted challenge? Use this only if the match never happened.",
+                          )
+                        )
+                          start(() => cancelChallenge(ch.id).then(() => {}));
+                      }}
+                      className="text-[10px] tracking-[0.1em] uppercase text-cs-ivory/55 hover:text-cs-loss"
+                    >
+                      Cancel · never played
+                    </button>
                   </div>
                 </div>
               )}

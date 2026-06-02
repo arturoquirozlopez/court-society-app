@@ -37,24 +37,58 @@ export default async function ChallengesPage() {
     created_at: string;
   }[] = [];
 
+  // Open challenges visible in the active city (subject to the 72h TTL)
+  let openRows: typeof challenges = [];
   if (activeCityId) {
     const { data } = await supabase
       .from("challenges")
       .select("*")
       .eq("city_id", activeCityId)
-      .neq("status", "cancelled")
+      .eq("status", "open")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
-    challenges = (data ?? []) as never;
+    openRows = (data ?? []) as never;
   }
 
-  // Hide challenges I've passed
+  // Accepted challenges where I'm a participant — no TTL, no city filter.
+  // They stay in the feed until a match is logged or someone cancels them.
+  const { data: acceptedRaw } = await supabase
+    .from("challenges")
+    .select("*")
+    .eq("status", "accepted")
+    .or(`author_id.eq.${me.id},accepted_by.eq.${me.id}`)
+    .order("created_at", { ascending: false });
+  const acceptedRows = (acceptedRaw ?? []) as never as typeof challenges;
+
+  // Filter accepted that already have a logged match
+  const acceptedIds = acceptedRows.map((c) => c.id);
+  const { data: matchedRows } = acceptedIds.length
+    ? await supabase
+        .from("matches")
+        .select("challenge_id")
+        .in("challenge_id", acceptedIds)
+    : { data: [] as { challenge_id: string }[] };
+  const playedSet = new Set(
+    (matchedRows ?? []).map((m) => m.challenge_id as string),
+  );
+  const pendingAccepted = acceptedRows.filter((c) => !playedSet.has(c.id));
+
+  // Hide challenges I've passed (only applies to open ones I haven't authored)
   const { data: passes } = await supabase
     .from("challenge_passes")
     .select("challenge_id")
     .eq("profile_id", me.id);
   const passedIds = new Set((passes ?? []).map((p) => p.challenge_id as string));
-  challenges = challenges.filter((c) => !passedIds.has(c.id) || c.author_id === me.id);
+
+  // Merge open + accepted (dedupe by id)
+  const byId = new Map<string, (typeof challenges)[number]>();
+  for (const c of [...openRows, ...pendingAccepted]) byId.set(c.id, c);
+  challenges = Array.from(byId.values())
+    .filter((c) => !passedIds.has(c.id) || c.author_id === me.id)
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
 
   // Authors + accepted-by profiles
   const peopleIds = Array.from(
