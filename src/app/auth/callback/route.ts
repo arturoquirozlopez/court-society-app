@@ -3,26 +3,42 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * Magic-link callback. Supabase sends the user here with `?code=...`.
- * We exchange the code for a session and then route by status.
+ * We exchange the code for a session and then route by status, preserving
+ * any `next` query parameter (used by the nominations flow to carry the
+ * `?nom=<token>` back to /apply).
  */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/";
+  const nextRaw = url.searchParams.get("next") ?? "";
+  // Only honour same-origin paths to prevent open-redirects
+  const next =
+    nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
+      ? nextRaw
+      : "";
 
-  if (!code) return NextResponse.redirect(new URL("/login?e=missing_code", url.origin));
+  if (!code) {
+    const back = new URL("/login", url.origin);
+    back.searchParams.set("e", "missing_code");
+    if (next) back.searchParams.set("next", next);
+    return NextResponse.redirect(back);
+  }
 
   const supabase = createClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    return NextResponse.redirect(
-      new URL(`/login?e=${encodeURIComponent(error.message)}`, url.origin),
-    );
+    const back = new URL("/login", url.origin);
+    back.searchParams.set("e", error.message);
+    if (next) back.searchParams.set("next", next);
+    return NextResponse.redirect(back);
   }
 
-  // Look up profile to route by status
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(new URL("/login", url.origin));
+  if (!user) {
+    const back = new URL("/login", url.origin);
+    if (next) back.searchParams.set("next", next);
+    return NextResponse.redirect(back);
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -30,9 +46,11 @@ export async function GET(request: NextRequest) {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile) {
-    // The trigger should have created it; give it a beat and send to /apply.
-    return NextResponse.redirect(new URL("/apply", url.origin));
+  // If a `next` was provided, honour it for pending/no-profile users so the
+  // nomination token survives the round-trip. /apply will gate-check the
+  // status itself and the trigger has another beat to populate the row.
+  if (!profile || profile.status === "pending") {
+    return NextResponse.redirect(new URL(next || "/apply", url.origin));
   }
 
   const target =
@@ -40,9 +58,8 @@ export async function GET(request: NextRequest) {
       ? "/app/profile"
       : profile.status === "waitlisted"
         ? "/waitlisted"
-        : profile.status === "rejected"
-          ? "/rejected"
-          : "/apply";
+        : "/rejected";
 
-  return NextResponse.redirect(new URL(next === "/" ? target : next, url.origin));
+  // For waitlisted/rejected we ignore `next` — gates own the routing.
+  return NextResponse.redirect(new URL(target, url.origin));
 }
