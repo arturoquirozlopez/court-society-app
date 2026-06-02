@@ -19,7 +19,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
     .select("*")
     .eq("id", user.id)
     .maybeSingle();
-  return (data as Profile | null) ?? null;
+  return (data as unknown as Profile | null) ?? null;
 }
 
 /** Require approved status or redirect. */

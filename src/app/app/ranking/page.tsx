@@ -28,7 +28,7 @@ export default async function RankingPage() {
   ]);
 
   const standings = season ? await getSeasonStandings(season.id) : new Map();
-  const players = ((members ?? []) as Profile[]).map((p) => {
+  const players = ((members ?? []) as unknown as Profile[]).map((p) => {
     const s = standings.get(p.id) ?? { wins: 0, losses: 0 };
     return { ...p, wins: s.wins, losses: s.losses };
   });

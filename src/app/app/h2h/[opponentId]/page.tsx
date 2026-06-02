@@ -22,7 +22,7 @@ export default async function H2hDetail({
     .eq("id", params.opponentId)
     .maybeSingle();
   if (!opp) notFound();
-  const opponent = opp as Profile;
+  const opponent = opp as unknown as Profile;
 
   const matches = await getHeadToHead(me.id, opponent.id);
   const confirmed = matches.filter((m) => m.status === "confirmed");

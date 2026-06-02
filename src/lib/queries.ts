@@ -51,7 +51,7 @@ export async function getHeadToHead(meId: string, opponentId: string) {
       `and(author_id.eq.${meId},opponent_id.eq.${opponentId}),and(author_id.eq.${opponentId},opponent_id.eq.${meId})`,
     )
     .order("created_at", { ascending: false });
-  return (data ?? []) as Match[];
+  return (data ?? []) as unknown as Match[];
 }
 
 /** Distinct opponents I have any match with (pending + confirmed). */
@@ -81,7 +81,7 @@ export async function getProfilesByIds(ids: string[]): Promise<Profile[]> {
   if (!ids.length) return [];
   const supabase = createClient();
   const { data } = await supabase.from("profiles").select("*").in("id", ids);
-  return (data ?? []) as Profile[];
+  return (data ?? []) as unknown as Profile[];
 }
 
 /** Cities (id → name) lookup. */

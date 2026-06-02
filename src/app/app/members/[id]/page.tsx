@@ -25,7 +25,7 @@ export default async function MemberDetail({ params }: { params: { id: string } 
     .eq("id", params.id)
     .maybeSingle();
   if (!data) notFound();
-  const m = data as Profile;
+  const m = data as unknown as Profile;
   if (m.status !== "approved") notFound();
 
   const [cityMap, clubMap, season] = await Promise.all([

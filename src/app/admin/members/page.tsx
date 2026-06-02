@@ -19,7 +19,7 @@ export default async function MembersAdminPage() {
     <MembersAdminClient
       meId={me.id}
       meRole={me.role}
-      members={(profiles ?? []) as Profile[]}
+      members={(profiles ?? []) as unknown as Profile[]}
       cityById={Object.fromEntries(cityMap)}
       clubById={Object.fromEntries(clubMap)}
     />

@@ -22,7 +22,7 @@ export default async function MembersPage() {
   ]);
 
   // RLS already filters to approved-visible, but defensive filter:
-  const members = ((profiles ?? []) as Profile[]).filter(
+  const members = ((profiles ?? []) as unknown as Profile[]).filter(
     (p) => p.status === "approved",
   );
 

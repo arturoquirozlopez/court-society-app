@@ -15,7 +15,7 @@ export default async function SeasonsPage() {
     .order("year", { ascending: false });
 
   // Quick stats for the active season header
-  const active = (seasons ?? []).find((s) => s.active) as Season | undefined;
+  const active = (seasons ?? []).find((s) => s.active) as unknown as Season | undefined;
   const standings = active ? await getSeasonStandings(active.id) : new Map();
   let totalMatches = 0;
   let totalPlayers = 0;
@@ -28,7 +28,7 @@ export default async function SeasonsPage() {
   return (
     <SeasonsClient
       meRole={me.role}
-      seasons={(seasons ?? []) as Season[]}
+      seasons={(seasons ?? []) as unknown as Season[]}
       activeStats={{
         matches: Math.round(totalMatches),
         players: totalPlayers,
