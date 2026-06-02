@@ -30,7 +30,7 @@ export default async function ApplicationsPage({
     : { data: [] as Profile[] };
 
   const profileById = new Map<string, Profile>(
-    (profiles ?? []).map((p) => [p.id as string, p as Profile]),
+    (profiles ?? []).map((p) => [p.id as string, p as unknown as Profile]),
   );
 
   const [cityMap, clubMap] = await Promise.all([getCityMap(), getClubMap()]);
@@ -38,7 +38,7 @@ export default async function ApplicationsPage({
   return (
     <ApplicationsClient
       filter={filter}
-      applications={(applications ?? []) as Application[]}
+      applications={(applications ?? []) as unknown as Application[]}
       profileById={Object.fromEntries(profileById)}
       cityById={Object.fromEntries(cityMap)}
       clubById={Object.fromEntries(clubMap)}
