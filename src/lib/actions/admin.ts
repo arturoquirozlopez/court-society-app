@@ -21,18 +21,35 @@ const ReviewSchema = z.object({
   note: z.string().max(1000).optional().or(z.literal("")),
 });
 
-async function requireAdminClient() {
+/**
+ * Discriminated union for the admin gate. The `ok` field is the
+ * discriminator — narrowing on `auth.ok` gives TypeScript a clean
+ * `error: string` on the failure branch and `supabase`/`userId`/`role`
+ * on the success branch, without the `"error" in auth` narrowing
+ * weakness that previously inferred `string | undefined`.
+ */
+type AdminAuth =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      supabase: ReturnType<typeof createClient>;
+      userId: string;
+      role: "admin" | "steward";
+    };
+
+async function requireAdminClient(): Promise<AdminAuth> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." } as const;
+  if (!user) return { ok: false, error: "Not signed in." };
   const { data: me } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (!me || (me.role !== "admin" && me.role !== "steward"))
-    return { error: "Forbidden." } as const;
-  return { supabase, userId: user.id, role: me.role as "admin" | "steward" } as const;
+  const role = (me as { role?: string } | null)?.role;
+  if (!role || (role !== "admin" && role !== "steward"))
+    return { ok: false, error: "Forbidden." };
+  return { ok: true, supabase, userId: user.id, role };
 }
 
 /**
@@ -44,7 +61,7 @@ export async function reviewApplication(
   input: z.infer<typeof ReviewSchema>,
 ): Promise<ActionResult> {
   const auth = await requireAdminClient();
-  if ("error" in auth) return { ok: false, error: auth.error } as const;
+  if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase, userId } = auth;
 
   const parsed = ReviewSchema.safeParse(input);
@@ -105,7 +122,7 @@ export async function setMemberRole(
   input: z.infer<typeof RoleSchema>,
 ): Promise<ActionResult> {
   const auth = await requireAdminClient();
-  if ("error" in auth) return { ok: false, error: auth.error } as const;
+  if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase, role } = auth;
 
   const parsed = RoleSchema.safeParse(input);
@@ -139,9 +156,9 @@ export async function setMemberRole(
 /** Open a new season; closes the currently active one. */
 export async function openNewSeason(year: number): Promise<ActionResult> {
   const auth = await requireAdminClient();
-  if ("error" in auth) return { ok: false, error: auth.error } as const;
+  if (!auth.ok) return { ok: false, error: auth.error };
   if (auth.role !== "admin")
-    return { ok: false, error: "Only admins can open seasons." } as const;
+    return { ok: false, error: "Only admins can open seasons." };
   const supabase = auth.supabase;
 
   // Close current
