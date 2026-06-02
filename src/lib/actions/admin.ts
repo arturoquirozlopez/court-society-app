@@ -93,7 +93,7 @@ export async function reviewApplication(
   const { data: applicant } = await supabase
     .from("profiles")
     .select("email, full_name")
-    .eq("id", app.profile_id)
+    .eq("id", app.profile_id as string)
     .maybeSingle();
   if (applicant?.email) {
     void sendStatusChange({
