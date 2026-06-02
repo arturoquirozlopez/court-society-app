@@ -35,6 +35,15 @@ export default async function H2hDetail({
     else losses += 1;
   }
 
+  // Number each match #1, #2, … in chronological order (oldest first).
+  // The list itself is rendered newest-first; we just look numbers up by id.
+  const chronological = [...matches].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+  const matchNumberById = new Map<string, number>();
+  chronological.forEach((m, i) => matchNumberById.set(m.id, i + 1));
+
   return (
     <div className="min-h-dvh">
       <div className="relative overflow-hidden bg-cs-green text-cs-ivory px-7 pt-[52px] pb-8">
@@ -85,13 +94,19 @@ export default async function H2hDetail({
               : meWon
                 ? "bg-cs-green text-cs-ivory"
                 : "bg-cs-loss text-white";
+          const num = matchNumberById.get(m.id) ?? 0;
           return (
             <li key={m.id} className="px-7 py-4 border-b border-black/10">
               <div className="flex justify-between items-center">
-                <span className={`text-[11px] tracking-wider uppercase font-medium px-2 py-0.5 ${cls}`}>
-                  {label}
-                </span>
-                <span className="font-display text-[20px]">{m.score ?? "—"}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-display text-[16px] text-cs-brass">
+                    #{num}
+                  </span>
+                  <span className={`text-[11px] tracking-wider uppercase font-medium px-2 py-0.5 ${cls}`}>
+                    {label}
+                  </span>
+                </div>
+                <span className="font-display text-[20px]">{(m.score ?? "—").replace(/-/g, "–")}</span>
               </div>
               <div className="text-[11px] text-cs-muted mt-1.5">
                 {fmtDate(m.created_at)}

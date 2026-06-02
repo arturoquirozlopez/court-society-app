@@ -4,29 +4,20 @@ import { useMemo, useState, useTransition } from "react";
 import { Sheet } from "@/components/Sheet";
 import { Avatar } from "@/components/Avatar";
 import { logMatch } from "@/lib/actions/matches";
+import { FORMAT_LABEL, type PlayFormat } from "@/lib/types";
 
-type Member = {
-  id: string;
-  full_name: string | null;
-  photo_url: string | null;
-  home_city_id: string | null;
-  home_club_id: string | null;
+export type PlayableChallenge = {
+  challenge_id: string;
+  opponent_id: string;
+  opponent_name: string | null;
+  opponent_photo: string | null;
+  city_name: string;
+  format: PlayFormat;
 };
 
-type Filter = "myclub" | "mycity" | "all";
-
-export function LogMatchFab({
-  meHomeCityId,
-  meHomeClubId,
-  allMembers,
-}: {
-  meHomeCityId: string | null;
-  meHomeClubId: string | null;
-  allMembers: Member[];
-}) {
+export function LogMatchFab({ playable }: { playable: PlayableChallenge[] }) {
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState<Filter>("myclub");
-  const [rival, setRival] = useState<Member | null>(null);
+  const [chosen, setChosen] = useState<PlayableChallenge | null>(null);
   const [result, setResult] = useState<"W" | "L" | null>(null);
   const [sets, setSets] = useState<{ a: string; b: string }[]>([
     { a: "", b: "" },
@@ -38,9 +29,10 @@ export function LogMatchFab({
   const [pending, start] = useTransition();
 
   function setSet(i: number, side: "a" | "b", v: string) {
-    // accept a single digit 0-9
     const cleaned = v.replace(/[^0-9]/g, "").slice(0, 1);
-    setSets((prev) => prev.map((s, idx) => (idx === i ? { ...s, [side]: cleaned } : s)));
+    setSets((prev) =>
+      prev.map((s, idx) => (idx === i ? { ...s, [side]: cleaned } : s)),
+    );
   }
 
   const score = useMemo(
@@ -57,20 +49,24 @@ export function LogMatchFab({
     return completed.length >= 1 && completed.length <= 3;
   }, [sets]);
 
-  const filtered = useMemo(() => {
-    return allMembers.filter((m) => {
-      if (filter === "myclub") return m.home_club_id && m.home_club_id === meHomeClubId;
-      if (filter === "mycity") return m.home_city_id && m.home_city_id === meHomeCityId;
-      return true;
-    });
-  }, [filter, allMembers, meHomeCityId, meHomeClubId]);
+  function reset() {
+    setChosen(null);
+    setResult(null);
+    setSets([
+      { a: "", b: "" },
+      { a: "", b: "" },
+      { a: "", b: "" },
+    ]);
+    setNote("");
+    setError(null);
+  }
 
   function submit() {
-    if (!rival || !result) return;
+    if (!chosen || !result) return;
     setError(null);
     start(async () => {
       const res = await logMatch({
-        opponent_id: rival.id,
+        challenge_id: chosen.challenge_id,
         author_result: result,
         score,
         note,
@@ -78,22 +74,20 @@ export function LogMatchFab({
       if (!res.ok) setError(res.error);
       else {
         setOpen(false);
-        setRival(null);
-        setResult(null);
-        setSets([
-          { a: "", b: "" },
-          { a: "", b: "" },
-          { a: "", b: "" },
-        ]);
-        setNote("");
+        reset();
       }
     });
   }
 
+  const isEmpty = playable.length === 0;
+
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          reset();
+          setOpen(true);
+        }}
         className="fixed bottom-[86px] right-[max(calc(50%-200px),16px)] w-14 h-14 bg-cs-green text-cs-ivory text-2xl flex items-center justify-center shadow-lg z-30"
         aria-label="Log match"
       >
@@ -102,154 +96,175 @@ export function LogMatchFab({
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title="Log a match"
-        subtitle="Select opponent, result, and score."
+        title={chosen ? `Log match vs ${chosen.opponent_name?.split(" ")[0] ?? "opponent"}` : "Log a match"}
+        subtitle={
+          chosen
+            ? `${FORMAT_LABEL[chosen.format]} · ${chosen.city_name}`
+            : isEmpty
+              ? "No accepted challenges yet."
+              : "Pick the challenge you played."
+        }
       >
-        <div className="flex gap-1.5 mb-3.5">
-          {(
-            [
-              ["myclub", "My club ★"],
-              ["mycity", "My city"],
-              ["all", "All"],
-            ] as const
-          ).map(([v, l]) => (
-            <button
-              key={v}
-              onClick={() => setFilter(v)}
-              className={`text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border whitespace-nowrap ${
-                filter === v
-                  ? "border-cs-green bg-cs-green text-cs-ivory"
-                  : "border-black/10 text-cs-muted"
-              }`}
-            >
-              {l}
+        {isEmpty ? (
+          <div className="text-center py-8">
+            <div className="font-display italic text-[20px] text-cs-green mb-2">
+              No challenges to score.
+            </div>
+            <p className="text-[13px] text-cs-muted leading-relaxed mb-6">
+              You can only log a result for a challenge that has been
+              accepted. Open the Challenges tab to post one, or challenge a
+              member directly from their profile.
+            </p>
+            <button onClick={() => setOpen(false)} className="btn-ghost" style={{ marginTop: 0 }}>
+              Close
             </button>
-          ))}
-        </div>
-
-        <div className="max-h-[260px] overflow-y-auto mb-4">
-          {filtered.map((m) => (
+          </div>
+        ) : !chosen ? (
+          <>
+            <label className="block text-[10px] tracking-[0.12em] uppercase text-cs-muted mb-2">
+              Accepted challenges
+            </label>
+            <ul className="border border-black/10 mb-2">
+              {playable.map((p) => (
+                <li key={p.challenge_id}>
+                  <button
+                    type="button"
+                    onClick={() => setChosen(p)}
+                    className="flex items-center gap-3 w-full text-left px-3 py-3 border-b border-black/5 hover:bg-cs-green/[0.04]"
+                  >
+                    <Avatar
+                      url={p.opponent_photo}
+                      seed={p.opponent_id}
+                      alt={p.opponent_name ?? ""}
+                      size={36}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium truncate">
+                        vs {p.opponent_name ?? "Member"}
+                      </div>
+                      <div className="text-[10px] text-cs-muted">
+                        {FORMAT_LABEL[p.format]} · {p.city_name}
+                      </div>
+                    </div>
+                    <span className="text-cs-brass">→</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-cs-muted leading-snug mb-4">
+              A match must come from an accepted challenge so both players see
+              the result and the H2H ranking stays accurate.
+            </p>
             <button
-              key={m.id}
-              type="button"
-              onClick={() => setRival(m)}
-              className="flex items-center gap-3 py-3 border-b border-black/10 w-full text-left"
+              onClick={() => setOpen(false)}
+              className="block w-full text-center text-[12px] text-cs-muted py-3.5"
             >
-              <Avatar url={m.photo_url} seed={m.id} alt={m.full_name ?? ""} size={40} />
-              <div className="flex-1 min-w-0">
-                <div className="text-[14px] font-medium truncate">{m.full_name}</div>
-              </div>
-              <span
-                className={`w-5 h-5 border-[1.5px] rounded-full flex items-center justify-center ${
-                  rival?.id === m.id ? "border-cs-green" : "border-black/20"
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setChosen(null)}
+              className="text-[10px] tracking-[0.15em] uppercase text-cs-muted hover:text-cs-black mb-3"
+            >
+              ← Pick another challenge
+            </button>
+
+            <label className="block text-[10px] tracking-[0.12em] uppercase text-cs-muted mb-1">
+              Result
+            </label>
+            <div className="flex gap-2.5 mb-3.5">
+              <button
+                onClick={() => setResult("W")}
+                className={`flex-1 py-3 border-[1.5px] text-[12px] tracking-wider ${
+                  result === "W"
+                    ? "border-cs-green bg-cs-green text-cs-ivory"
+                    : "border-black/10"
                 }`}
               >
-                {rival?.id === m.id && (
-                  <span className="w-2 h-2 rounded-full bg-cs-green" />
-                )}
-              </span>
-            </button>
-          ))}
-          {filtered.length === 0 && (
-            <p className="py-6 text-center text-[12px] text-cs-muted">
-              No members in this filter.
-            </p>
-          )}
-        </div>
-
-        <label className="block text-[10px] tracking-[0.12em] uppercase text-cs-muted mb-1">
-          Result
-        </label>
-        <div className="flex gap-2.5 mb-3.5">
-          <button
-            onClick={() => setResult("W")}
-            className={`flex-1 py-3 border-[1.5px] text-[12px] tracking-wider ${
-              result === "W"
-                ? "border-cs-green bg-cs-green text-cs-ivory"
-                : "border-black/10"
-            }`}
-          >
-            Won
-          </button>
-          <button
-            onClick={() => setResult("L")}
-            className={`flex-1 py-3 border-[1.5px] text-[12px] tracking-wider ${
-              result === "L"
-                ? "border-cs-loss bg-cs-loss text-white"
-                : "border-black/10"
-            }`}
-          >
-            Lost
-          </button>
-        </div>
-
-        <label className="block text-[10px] tracking-[0.12em] uppercase text-cs-muted mb-2 mt-1">
-          Score · sets
-        </label>
-        <div className="space-y-2 mb-4">
-          {sets.map((s, i) => {
-            const optional = i >= 1;
-            return (
-              <div key={i} className="flex items-center gap-3">
-                <span className="text-[10px] tracking-[0.15em] uppercase text-cs-muted w-12">
-                  Set {i + 1}
-                  {optional ? "*" : ""}
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={s.a}
-                  onChange={(e) => setSet(i, "a", e.target.value)}
-                  placeholder="—"
-                  className="w-11 h-11 border border-black/15 text-center text-[18px] font-display text-cs-green focus:border-cs-green outline-none bg-transparent"
-                />
-                <span className="text-[14px] text-cs-muted">–</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={s.b}
-                  onChange={(e) => setSet(i, "b", e.target.value)}
-                  placeholder="—"
-                  className="w-11 h-11 border border-black/15 text-center text-[18px] font-display text-cs-green focus:border-cs-green outline-none bg-transparent"
-                />
-                <span className="text-[10px] text-cs-muted">
-                  {result === "W" ? "you · them" : "you · them"}
-                </span>
-              </div>
-            );
-          })}
-          <div className="text-[10px] text-cs-muted leading-snug">
-            * Sets 2 and 3 optional · 0–9 games per set · examples: 6–4 · 6–4 7–5 · 6–4 3–6 9–7
-          </div>
-          {score && (
-            <div className="text-[11px] tracking-[0.1em] uppercase text-cs-brass pt-1">
-              Final: {score.replace(/-/g, "–")}
+                Won
+              </button>
+              <button
+                onClick={() => setResult("L")}
+                className={`flex-1 py-3 border-[1.5px] text-[12px] tracking-wider ${
+                  result === "L"
+                    ? "border-cs-loss bg-cs-loss text-white"
+                    : "border-black/10"
+                }`}
+              >
+                Lost
+              </button>
             </div>
-          )}
-        </div>
 
-        <textarea
-          className="field-input min-h-[60px] resize-none"
-          placeholder="Note (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
+            <label className="block text-[10px] tracking-[0.12em] uppercase text-cs-muted mb-2 mt-1">
+              Score · sets
+            </label>
+            <div className="space-y-2 mb-4">
+              {sets.map((s, i) => {
+                const optional = i >= 1;
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-[10px] tracking-[0.15em] uppercase text-cs-muted w-12">
+                      Set {i + 1}
+                      {optional ? "*" : ""}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={s.a}
+                      onChange={(e) => setSet(i, "a", e.target.value)}
+                      placeholder="—"
+                      className="w-11 h-11 border border-black/15 text-center text-[18px] font-display text-cs-green focus:border-cs-green outline-none bg-transparent"
+                    />
+                    <span className="text-[14px] text-cs-muted">–</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={s.b}
+                      onChange={(e) => setSet(i, "b", e.target.value)}
+                      placeholder="—"
+                      className="w-11 h-11 border border-black/15 text-center text-[18px] font-display text-cs-green focus:border-cs-green outline-none bg-transparent"
+                    />
+                    <span className="text-[10px] text-cs-muted">you · them</span>
+                  </div>
+                );
+              })}
+              <div className="text-[10px] text-cs-muted leading-snug">
+                * Sets 2 and 3 optional · 0–9 games per set · examples: 6–4 · 6–4 7–5 · 6–4 3–6 9–7
+              </div>
+              {score && (
+                <div className="text-[11px] tracking-[0.1em] uppercase text-cs-brass pt-1">
+                  Final: {score.replace(/-/g, "–")}
+                </div>
+              )}
+            </div>
 
-        {error && <p className="text-[12px] text-cs-loss mt-2">{error}</p>}
+            <textarea
+              className="field-input min-h-[60px] resize-none"
+              placeholder="Note (optional)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
 
-        <button
-          onClick={submit}
-          disabled={!rival || !result || !scoreValid || pending}
-          className="btn-primary mt-3.5"
-        >
-          {pending ? "Saving…" : "Save match"}
-        </button>
-        <button
-          onClick={() => setOpen(false)}
-          className="block w-full text-center text-[12px] text-cs-muted py-3.5 mt-1"
-        >
-          Cancel
-        </button>
+            {error && <p className="text-[12px] text-cs-loss mt-2">{error}</p>}
+
+            <button
+              onClick={submit}
+              disabled={!result || !scoreValid || pending}
+              className="btn-primary mt-3.5"
+            >
+              {pending ? "Saving…" : "Save match"}
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="block w-full text-center text-[12px] text-cs-muted py-3.5 mt-1"
+            >
+              Cancel
+            </button>
+          </>
+        )}
       </Sheet>
     </>
   );

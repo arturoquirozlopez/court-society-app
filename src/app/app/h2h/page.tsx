@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { requireApproved } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getMyRivals, getProfilesByIds } from "@/lib/queries";
+import {
+  getCityMap,
+  getMyRivals,
+  getProfilesByIds,
+} from "@/lib/queries";
 import { winRate } from "@/lib/format";
 import { Hero } from "@/components/Hero";
 import { Avatar } from "@/components/Avatar";
-import { LogMatchFab } from "./LogMatchFab";
+import { LogMatchFab, type PlayableChallenge } from "./LogMatchFab";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +29,55 @@ export default async function H2hPage() {
   const totalW = Array.from(rivals.values()).reduce((s, v) => s + v.wins, 0);
   const totalL = Array.from(rivals.values()).reduce((s, v) => s + v.losses, 0);
 
-  // Member picker data for the FAB sheet
-  const { data: allMembers } = await supabase
-    .from("profiles")
-    .select("id, full_name, photo_url, home_city_id, home_club_id")
-    .eq("status", "approved")
-    .neq("id", me.id)
-    .order("full_name");
+  // Playable challenges = accepted, I'm a participant, no match logged yet
+  const cityMap = await getCityMap();
+  const { data: accepted } = await supabase
+    .from("challenges")
+    .select("id, author_id, accepted_by, city_id, format")
+    .eq("status", "accepted")
+    .or(`author_id.eq.${me.id},accepted_by.eq.${me.id}`);
+
+  const acceptedIds = (accepted ?? []).map((c) => c.id as string);
+  const { data: matched } = acceptedIds.length
+    ? await supabase
+        .from("matches")
+        .select("challenge_id")
+        .in("challenge_id", acceptedIds)
+    : { data: [] as { challenge_id: string }[] };
+  const matchedSet = new Set(
+    (matched ?? []).map((m) => m.challenge_id as string),
+  );
+
+  const playableRows = ((accepted ?? []) as {
+    id: string;
+    author_id: string;
+    accepted_by: string | null;
+    city_id: string;
+    format: string;
+  }[]).filter((c) => !matchedSet.has(c.id));
+
+  const opponentIds = Array.from(
+    new Set(
+      playableRows.map((c) =>
+        c.author_id === me.id ? (c.accepted_by as string) : c.author_id,
+      ),
+    ),
+  );
+  const opponentProfiles = await getProfilesByIds(opponentIds);
+  const opponentById = new Map(opponentProfiles.map((p) => [p.id, p] as const));
+
+  const playable: PlayableChallenge[] = playableRows.map((c) => {
+    const oppId = c.author_id === me.id ? (c.accepted_by as string) : c.author_id;
+    const opp = opponentById.get(oppId);
+    return {
+      challenge_id: c.id,
+      opponent_id: oppId,
+      opponent_name: opp?.full_name ?? null,
+      opponent_photo: opp?.photo_url ?? null,
+      city_name: cityMap.get(c.city_id)?.name ?? "—",
+      format: c.format as "singles" | "doubles" | "both",
+    };
+  });
 
   return (
     <div>
@@ -45,7 +91,9 @@ export default async function H2hPage() {
             No matches yet.
           </div>
           <div className="text-[12px] text-cs-muted mt-2 leading-relaxed">
-            Log your first match with the ＋ button.
+            {playable.length > 0
+              ? "Log your first match with the ＋ button."
+              : "Accept a challenge first, then come back to log the result."}
           </div>
         </div>
       )}
@@ -76,11 +124,7 @@ export default async function H2hPage() {
           );
         })}
       </ul>
-      <LogMatchFab
-        meHomeCityId={me.home_city_id}
-        meHomeClubId={me.home_club_id}
-        allMembers={(allMembers ?? []) as never}
-      />
+      <LogMatchFab playable={playable} />
     </div>
   );
 }

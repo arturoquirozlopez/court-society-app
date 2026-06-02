@@ -15,7 +15,8 @@ import { sendMatchConfirmationRequest } from "@/lib/email";
 const SCORE_RE = /^[0-9]-[0-9]( [0-9]-[0-9]){0,2}(\(\d{1,2}-\d{1,2}\))?$/;
 
 const NewMatch = z.object({
-  opponent_id: z.string().uuid(),
+  /** A match must be linked to an accepted challenge. */
+  challenge_id: z.string().uuid(),
   author_result: z.enum(["W", "L"]),
   score: z
     .string()
@@ -32,11 +33,56 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
   if (!user) return { ok: false, error: "Not signed in." } as const;
 
   const parsed = NewMatch.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Invalid input." } as const;
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input.",
+    } as const;
   const v = parsed.data;
 
-  if (v.opponent_id === user.id)
-    return { ok: false, error: "You can't log a match against yourself." } as const;
+  // Load the linked challenge and validate it
+  const { data: ch } = await supabase
+    .from("challenges")
+    .select("id, author_id, accepted_by, status")
+    .eq("id", v.challenge_id)
+    .maybeSingle();
+  if (!ch)
+    return { ok: false, error: "Challenge not found." } as const;
+  const row = ch as {
+    id: string;
+    author_id: string;
+    accepted_by: string | null;
+    status: string;
+  };
+  if (row.status !== "accepted")
+    return {
+      ok: false,
+      error: "You can only log a match for an accepted challenge.",
+    } as const;
+
+  const isAuthor = row.author_id === user.id;
+  const isAcceptor = row.accepted_by === user.id;
+  if (!isAuthor && !isAcceptor)
+    return {
+      ok: false,
+      error: "You are not a participant of this challenge.",
+    } as const;
+
+  const opponent_id = isAuthor ? row.accepted_by : row.author_id;
+  if (!opponent_id)
+    return { ok: false, error: "Challenge has no opponent." } as const;
+
+  // Reject duplicate match for the same challenge
+  const { data: existing } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("challenge_id", v.challenge_id)
+    .maybeSingle();
+  if (existing)
+    return {
+      ok: false,
+      error: "A match has already been logged for this challenge.",
+    } as const;
 
   const season = await getActiveSeason();
   if (!season) return { ok: false, error: "No active season." } as const;
@@ -44,19 +90,20 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
   const { error } = await supabase.from("matches").insert({
     season_id: season.id,
     author_id: user.id,
-    opponent_id: v.opponent_id,
+    opponent_id,
     author_result: v.author_result,
     score: v.score || null,
     note: v.note || null,
+    challenge_id: v.challenge_id,
   });
   if (error) return { ok: false, error: error.message } as const;
 
-  // Notify the opponent that they need to confirm/dispute (best-effort)
+  // Notify the opponent (best-effort)
   const [{ data: opponent }, { data: me }] = await Promise.all([
     supabase
       .from("profiles")
       .select("email, full_name")
-      .eq("id", v.opponent_id)
+      .eq("id", opponent_id)
       .maybeSingle(),
     supabase
       .from("profiles")
@@ -72,7 +119,6 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
       to: opEmail,
       firstName: opName?.split(" ")[0],
       authorName: myName,
-      // Opponent won iff author's result is 'L'
       opponentWon: v.author_result === "L",
       score: v.score || null,
       note: v.note || undefined,
@@ -84,6 +130,7 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
   revalidatePath("/app/h2h");
   revalidatePath("/app/ranking");
   revalidatePath("/app/profile");
+  revalidatePath("/app/challenges");
   return { ok: true } as const;
 }
 
