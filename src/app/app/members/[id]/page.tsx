@@ -12,6 +12,7 @@ import {
 import { winRate, waLink, fmtDate, linkedinDisplay } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { LEVEL_LABEL, type Profile } from "@/lib/types";
+import { ChallengeMemberButton } from "./ChallengeMemberButton";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,20 @@ export default async function MemberDetail({ params }: { params: { id: string } 
           >
             💬 Message on WhatsApp
           </a>
+        )}
+        {me.id !== m.id && (
+          <ChallengeMemberButton
+            targetId={m.id}
+            targetName={m.full_name ?? "this member"}
+            targetCityId={m.home_city_id}
+            targetClubId={m.home_club_id}
+            meLevel={me.level}
+            clubs={Array.from(clubMap.entries()).map(([id, c]) => ({
+              id,
+              name: c.name,
+              city_id: c.city_id,
+            }))}
+          />
         )}
         <div className="h-12" />
       </div>

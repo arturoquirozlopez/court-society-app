@@ -6,12 +6,29 @@ import {
   acceptGroupInvitation,
   declineGroupInvitation,
 } from "@/lib/actions/groups";
+import {
+  acceptChallenge,
+  declineDirectChallenge,
+} from "@/lib/actions/challenges";
 import { fmtRel } from "@/lib/format";
-import type {
-  GroupInvitation,
-  Match,
-  Profile,
+import {
+  FORMAT_LABEL,
+  type GroupInvitation,
+  type Match,
+  type PlayFormat,
+  type Profile,
 } from "@/lib/types";
+
+export type DirectChallengeInbox = {
+  id: string;
+  author_id: string;
+  author_name: string | null;
+  city_name: string;
+  format: PlayFormat;
+  note: string | null;
+  created_at: string;
+  expires_at: string;
+};
 
 /**
  * Unified "items that need your reply" surface at the top of the Profile page.
@@ -26,12 +43,17 @@ export function PendingInbox({
   matchConfirmations,
   authorById,
   groupInvitations,
+  directChallenges,
 }: {
   matchConfirmations: Match[];
   authorById: Map<string, Profile>;
   groupInvitations: GroupInvitation[];
+  directChallenges: DirectChallengeInbox[];
 }) {
-  const total = matchConfirmations.length + groupInvitations.length;
+  const total =
+    matchConfirmations.length +
+    groupInvitations.length +
+    directChallenges.length;
   const [busy, start] = useTransition();
   if (total === 0) return null;
 
@@ -131,6 +153,56 @@ export function PendingInbox({
                   onClick={() =>
                     start(() =>
                       declineGroupInvitation(inv.group_id).then(() => {}),
+                    )
+                  }
+                  className="px-3 py-1.5 border border-black/15 text-cs-muted text-[10px] tracking-wider uppercase hover:border-cs-loss hover:text-cs-loss"
+                >
+                  Decline
+                </button>
+              </div>
+            </div>
+          </li>
+        ))}
+
+        {/* Direct challenges */}
+        {directChallenges.map((ch) => (
+          <li key={ch.id} className="px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] tracking-[0.15em] uppercase text-cs-brass mb-1">
+                  Direct challenge · accept or decline
+                </div>
+                <div className="text-[12.5px] text-cs-black leading-snug">
+                  <strong className="text-cs-green">
+                    {ch.author_name ?? "A member"}
+                  </strong>{" "}
+                  challenged you to {FORMAT_LABEL[ch.format]} in{" "}
+                  <span className="font-display italic">{ch.city_name}</span>
+                </div>
+                {ch.note && (
+                  <div className="text-[11px] italic text-cs-muted mt-1 border-l-2 border-cs-brass pl-2 leading-snug">
+                    &ldquo;{ch.note}&rdquo;
+                  </div>
+                )}
+                <div className="text-[10px] text-cs-muted mt-1">
+                  {fmtRel(ch.created_at)}
+                </div>
+              </div>
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    start(() => acceptChallenge(ch.id).then(() => {}))
+                  }
+                  className="px-3 py-1.5 bg-cs-green text-cs-ivory text-[10px] tracking-wider uppercase"
+                >
+                  Accept
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    start(() =>
+                      declineDirectChallenge(ch.id).then(() => {}),
                     )
                   }
                   className="px-3 py-1.5 border border-black/15 text-cs-muted text-[10px] tracking-wider uppercase hover:border-cs-loss hover:text-cs-loss"

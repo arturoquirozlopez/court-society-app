@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveSeason } from "@/lib/queries";
+import { sendMatchConfirmationRequest } from "@/lib/email";
 
 /**
  * Standardised score format: each set is a "G-G" pair separated by spaces.
@@ -50,8 +51,39 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
   });
   if (error) return { ok: false, error: error.message } as const;
 
+  // Notify the opponent that they need to confirm/dispute (best-effort)
+  const [{ data: opponent }, { data: me }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", v.opponent_id)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ]);
+  const opEmail = (opponent as { email?: string } | null)?.email;
+  const opName = (opponent as { full_name?: string | null } | null)?.full_name;
+  const myName = (me as { full_name?: string | null } | null)?.full_name;
+  if (opEmail && myName) {
+    void sendMatchConfirmationRequest({
+      to: opEmail,
+      firstName: opName?.split(" ")[0],
+      authorName: myName,
+      // Opponent won iff author's result is 'L'
+      opponentWon: v.author_result === "L",
+      score: v.score || null,
+      note: v.note || undefined,
+    }).catch((e) =>
+      console.error("[email] sendMatchConfirmationRequest failed:", e),
+    );
+  }
+
   revalidatePath("/app/h2h");
   revalidatePath("/app/ranking");
+  revalidatePath("/app/profile");
   return { ok: true } as const;
 }
 

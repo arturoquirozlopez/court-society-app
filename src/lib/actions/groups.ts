@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { sendGroupInvitationEmail } from "@/lib/email";
 
 type ActionResult =
   | { ok: true; id?: string }
@@ -63,10 +64,52 @@ export async function createGroup(
       await supabase.from("groups").delete().eq("id", group.id);
       return { ok: false, error: insertErr.message };
     }
+
+    // Notify each invitee by email (best-effort, doesn't block on errors)
+    void notifyInvitees(supabase, otherMembers, v.name, user.id);
   }
 
   revalidatePath("/app/ranking");
   return { ok: true, id: group.id };
+}
+
+async function notifyInvitees(
+  supabase: ReturnType<typeof createClient>,
+  inviteeIds: string[],
+  groupName: string,
+  inviterId: string,
+) {
+  try {
+    const [{ data: invitees }, { data: inviter }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, email, full_name")
+        .in("id", inviteeIds),
+      supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", inviterId)
+        .maybeSingle(),
+    ]);
+    const inviterName =
+      (inviter as { full_name?: string | null } | null)?.full_name ?? "A member";
+    for (const row of (invitees ?? []) as {
+      email: string;
+      full_name: string | null;
+    }[]) {
+      if (!row.email) continue;
+      await sendGroupInvitationEmail({
+        to: row.email,
+        firstName: row.full_name?.split(" ")[0],
+        inviterName,
+        groupName,
+      }).catch((e) =>
+        console.error("[email] sendGroupInvitationEmail failed:", e),
+      );
+    }
+  } catch (e) {
+    console.error("[notifyInvitees] failed:", e);
+  }
 }
 
 /** Rename — creator only (RLS enforces it). */
@@ -118,6 +161,9 @@ export async function addGroupMembers(
 ): Promise<ActionResult> {
   if (memberIds.length === 0) return { ok: true };
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
   const { error } = await supabase
     .from("group_members")
     .insert(
@@ -128,6 +174,16 @@ export async function addGroupMembers(
       })),
     );
   if (error) return { ok: false, error: error.message };
+
+  // Notify the new invitees
+  const { data: groupRow } = await supabase
+    .from("groups")
+    .select("name")
+    .eq("id", groupId)
+    .maybeSingle();
+  const groupName = (groupRow as { name?: string } | null)?.name ?? "a group";
+  void notifyInvitees(supabase, memberIds, groupName, user.id);
+
   revalidatePath("/app/ranking");
   return { ok: true };
 }

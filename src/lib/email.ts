@@ -257,3 +257,120 @@ export async function sendNominationInvite(opts: {
     html,
   });
 }
+
+/**
+ * Match-confirmation request. Sent to the opponent when an author logs a
+ * match. The opponent confirms / disputes inside the app's inbox.
+ */
+export async function sendMatchConfirmationRequest(opts: {
+  to: string;
+  firstName?: string;
+  authorName: string;
+  /** From the opponent's POV: "you won" or "they won". */
+  opponentWon: boolean;
+  score: string | null;
+  note?: string;
+}) {
+  const r = getResend();
+  if (!r) return;
+  const name = opts.firstName ? escapeHtml(opts.firstName) : "";
+  const greeting = name ? `Dear ${name},` : "Hello,";
+  const score = (opts.score ?? "—").replace(/-/g, "&ndash;");
+  const author = escapeHtml(opts.authorName);
+  const outcome = opts.opponentWon ? "you won" : "they won";
+  const body =
+    paragraph(greeting) +
+    paragraph(
+      `<strong style="color:${COLORS.green};">${author}</strong> logged a match against you &mdash; ${outcome} <span style="font-family:Georgia,serif;color:${COLORS.green};">${score}</span>.`,
+    ) +
+    paragraph(
+      "Open Court Society and confirm or dispute the result so the ranking stays accurate.",
+    ) +
+    (opts.note ? reviewerNote(opts.note) : "");
+  const html = shell({
+    preheader: `${opts.authorName} logged a match. Confirm or dispute it.`,
+    title: "Confirm a match result.",
+    body,
+    cta: { label: "Open Court Society", url: APP_URL },
+  });
+  await r.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject: `${opts.authorName} logged a match — please confirm`,
+    html,
+  });
+}
+
+/** Group invitation email — sent to each invitee when a group is created. */
+export async function sendGroupInvitationEmail(opts: {
+  to: string;
+  firstName?: string;
+  inviterName: string;
+  groupName: string;
+}) {
+  const r = getResend();
+  if (!r) return;
+  const name = opts.firstName ? escapeHtml(opts.firstName) : "";
+  const greeting = name ? `Dear ${name},` : "Hello,";
+  const inviter = escapeHtml(opts.inviterName);
+  const group = escapeHtml(opts.groupName);
+  const body =
+    paragraph(greeting) +
+    paragraph(
+      `<strong style="color:${COLORS.green};">${inviter}</strong> invited you to <span style="font-family:Georgia,serif;font-style:italic;">${group}</span> &mdash; a private ranking group inside Court Society.`,
+    ) +
+    paragraph(
+      "Open the app to accept or decline. Once you accept, the group&rsquo;s ranking unlocks for you.",
+    );
+  const html = shell({
+    preheader: `${opts.inviterName} invited you to ${opts.groupName}.`,
+    title: "A private group invitation.",
+    body,
+    cta: { label: "Open Court Society", url: APP_URL },
+  });
+  await r.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject: `${opts.inviterName} invited you to ${opts.groupName}`,
+    html,
+  });
+}
+
+/** Direct-challenge email — sent to the target of a challenge. */
+export async function sendDirectChallenge(opts: {
+  to: string;
+  firstName?: string;
+  authorName: string;
+  cityName: string;
+  format: string;
+  note?: string;
+}) {
+  const r = getResend();
+  if (!r) return;
+  const name = opts.firstName ? escapeHtml(opts.firstName) : "";
+  const greeting = name ? `Dear ${name},` : "Hello,";
+  const author = escapeHtml(opts.authorName);
+  const city = escapeHtml(opts.cityName);
+  const format = escapeHtml(opts.format);
+  const body =
+    paragraph(greeting) +
+    paragraph(
+      `<strong style="color:${COLORS.green};">${author}</strong> has challenged you to a ${format} match in <span style="font-family:Georgia,serif;font-style:italic;">${city}</span>.`,
+    ) +
+    paragraph(
+      "Open Court Society to accept or decline. You have 72 hours before the challenge expires.",
+    ) +
+    (opts.note ? reviewerNote(opts.note) : "");
+  const html = shell({
+    preheader: `${opts.authorName} challenged you in ${opts.cityName}.`,
+    title: "A direct challenge.",
+    body,
+    cta: { label: "Open Court Society", url: APP_URL },
+  });
+  await r.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject: `${opts.authorName} challenged you in ${opts.cityName}`,
+    html,
+  });
+}

@@ -99,6 +99,43 @@ export default async function ProfilePage() {
     };
   });
 
+  // Direct challenges aimed at me (still open, not expired)
+  const { data: directChRows } = await supabase
+    .from("challenges")
+    .select("id, author_id, city_id, format, note, created_at, expires_at, status")
+    .eq("target_id", me.id)
+    .eq("status", "open")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+
+  const directChallengeAuthorIds = Array.from(
+    new Set(((directChRows ?? []) as { author_id: string }[]).map((c) => c.author_id)),
+  );
+  const directChallengeAuthors = await getProfilesByIds(directChallengeAuthorIds);
+  const directChallengeAuthorById = new Map(
+    directChallengeAuthors.map((p) => [p.id, p] as const),
+  );
+
+  const directChallenges = ((directChRows ?? []) as {
+    id: string;
+    author_id: string;
+    city_id: string;
+    format: string;
+    note: string | null;
+    created_at: string;
+    expires_at: string;
+  }[]).map((c) => ({
+    id: c.id,
+    author_id: c.author_id,
+    author_name:
+      directChallengeAuthorById.get(c.author_id)?.full_name ?? null,
+    city_name: cityMap.get(c.city_id)?.name ?? "—",
+    format: c.format as "singles" | "doubles" | "both",
+    note: c.note,
+    created_at: c.created_at,
+    expires_at: c.expires_at,
+  }));
+
   const cityName = me.home_city_id ? cityMap.get(me.home_city_id)?.name ?? "—" : "—";
   const clubName = me.home_club_id
     ? me.other_club_name && clubMap.get(me.home_club_id)?.is_other
@@ -145,11 +182,12 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      {/* Unified inbox at the top — confirmations + invitations */}
+      {/* Unified inbox at the top — confirmations + invitations + direct challenges */}
       <PendingInbox
         matchConfirmations={(pending ?? []) as unknown as Match[]}
         authorById={authorById}
         groupInvitations={groupInvitations}
+        directChallenges={directChallenges}
       />
 
       <div className="px-7 pt-6">
