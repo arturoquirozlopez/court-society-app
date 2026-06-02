@@ -35,3 +35,27 @@ export function waLink(phone: string | null | undefined, text?: string) {
   const q = text ? `?text=${encodeURIComponent(text)}` : "";
   return `https://wa.me/${num}${q}`;
 }
+
+/**
+ * Normalize a LinkedIn URL into { url, label }. Ensures the link is openable
+ * (adds https:// when missing) and produces a short display string like
+ * "linkedin.com/in/<handle>" for the UI instead of the raw URL.
+ */
+export function linkedinDisplay(
+  raw: string | null | undefined,
+): { url: string; label: string } | null {
+  if (!raw) return null;
+  let value = raw.trim();
+  if (!value) return null;
+  if (!/^https?:\/\//i.test(value)) value = `https://${value}`;
+  try {
+    const u = new URL(value);
+    const handleMatch = u.pathname.match(/\/in\/([^/]+)/i);
+    const label = handleMatch
+      ? `linkedin.com/in/${handleMatch[1]}`
+      : u.host.replace(/^www\./, "") + u.pathname.replace(/\/$/, "");
+    return { url: u.toString(), label };
+  } catch {
+    return null;
+  }
+}

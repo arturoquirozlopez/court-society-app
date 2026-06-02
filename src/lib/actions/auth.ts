@@ -19,11 +19,24 @@ export async function sendMagicLink(formData: FormData): Promise<LoginResult> {
   const parsed = EmailSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Enter a valid email." };
 
+  // Preserve the post-login destination through the magic-link round-trip
+  // (used by the nominations flow so the nominee lands back on /apply?nom=…).
+  const nextRaw = String(formData.get("next") ?? "");
+  const nextOk =
+    nextRaw &&
+    nextRaw.startsWith("/") &&
+    !nextRaw.startsWith("//") &&
+    nextRaw.length < 256;
+  const callbackUrl = new URL(
+    `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+  );
+  if (nextOk) callbackUrl.searchParams.set("next", nextRaw);
+
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      emailRedirectTo: callbackUrl.toString(),
       shouldCreateUser: true,
     },
   });

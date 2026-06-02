@@ -156,3 +156,37 @@ export interface VisitingPlan {
   end_date: string | null;
   created_at: string;
 }
+
+export type NominationStatus =
+  | "pending"
+  | "applied"
+  | "approved"
+  | "declined"
+  | "expired"
+  | "cancelled";
+
+export interface Nomination {
+  id: string;
+  token: string;
+  nominator_id: string;
+  nominee_email: string;
+  nominee_name: string;
+  note: string | null;
+  status: NominationStatus;
+  expires_at: string;
+  applied_profile_id: string | null;
+  applied_at: string | null;
+  created_at: string;
+}
+
+/** Shape returned by the `nomination_by_token` Postgres function. */
+export interface NominationByToken {
+  id: string;
+  nominator_id: string;
+  nominator_name: string | null;
+  nominee_email: string;
+  nominee_name: string;
+  note: string | null;
+  status: NominationStatus;
+  expires_at: string;
+}

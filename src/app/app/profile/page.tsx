@@ -13,11 +13,14 @@ import {
   FORMAT_LABEL,
   FREQUENCY_LABEL,
 } from "@/lib/types";
-import { winRate, fmtDate } from "@/lib/format";
+import { winRate, fmtDate, linkedinDisplay } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { SignOutLink } from "@/components/SignOutLink";
 import { ProfileEditor } from "./ProfileEditor";
 import { PendingConfirmations } from "./PendingConfirmations";
+import { NominateButton } from "./NominateButton";
+import { MyNominations } from "./MyNominations";
+import type { Nomination } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +51,14 @@ export default async function ProfilePage() {
   );
   const authors = await getProfilesByIds(authorIds);
   const authorById = new Map(authors.map((a) => [a.id, a] as const));
+
+  // My nominations (any status)
+  const { data: nominationsData } = await supabase
+    .from("nominations")
+    .select("*")
+    .eq("nominator_id", me.id)
+    .order("created_at", { ascending: false });
+  const myNominations = (nominationsData ?? []) as unknown as Nomination[];
 
   const cityName = me.home_city_id ? cityMap.get(me.home_city_id)?.name ?? "—" : "—";
   const clubName = me.home_club_id
@@ -144,8 +155,38 @@ export default async function ProfilePage() {
         <ReadRow l="Format" v={me.format ? FORMAT_LABEL[me.format] : "—"} />
         <ReadRow l="Frequency" v={me.frequency ? FREQUENCY_LABEL[me.frequency] : "—"} />
         <ReadRow l="Travel" v={me.travel_city_ids.map((id) => cityMap.get(id)?.name).filter(Boolean).join(", ") || "—"} />
-        <ReadRow l="LinkedIn" v={me.linkedin_url ?? "—"} />
+        <ReadRow
+          l="LinkedIn"
+          v={
+            (() => {
+              const li = linkedinDisplay(me.linkedin_url);
+              return li ? (
+                <a
+                  href={li.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cs-green underline decoration-cs-brass underline-offset-2 hover:decoration-cs-green"
+                >
+                  {li.label}
+                </a>
+              ) : (
+                "—"
+              );
+            })()
+          }
+        />
         <ReadRow l="Member since" v={fmtDate(me.joined_at ?? me.created_at)} />
+
+        {/* Nominations */}
+        <div className="mt-6">
+          <h2 className="section-header mb-3">Nominate</h2>
+          <p className="text-[12px] text-cs-muted leading-relaxed mb-3">
+            Court Society grows by trust. Invite someone you would be proud to
+            play across the net.
+          </p>
+          <NominateButton />
+        </div>
+        <MyNominations rows={myNominations} />
 
         {(me.role === "admin" || me.role === "steward") && (
           <a

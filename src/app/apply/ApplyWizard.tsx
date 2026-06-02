@@ -6,6 +6,7 @@ import {
   type City,
   type Club,
   type Profile,
+  type NominationByToken,
   LEVEL_LABEL,
   FORMAT_LABEL,
   FREQUENCY_LABEL,
@@ -29,16 +30,18 @@ export function ApplyWizard({
   profile,
   cities,
   clubs,
+  nomination,
 }: {
   profile: Profile;
   cities: City[];
   clubs: Club[];
+  nomination: NominationByToken | null;
 }) {
   const [step, setStep] = useState(0);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState<Values>({
-    full_name: profile.full_name ?? "",
+    full_name: profile.full_name ?? nomination?.nominee_name ?? "",
     headline: profile.headline ?? "",
     linkedin_url: profile.linkedin_url ?? "",
     whatsapp: profile.whatsapp ?? "",
@@ -49,7 +52,8 @@ export function ApplyWizard({
     format: (profile.format ?? "singles") as PlayFormat,
     frequency: (profile.frequency ?? "weekly") as PlayFrequency,
     travel_city_ids: profile.travel_city_ids ?? [],
-    nominated_by_text: profile.nominated_by_text ?? "",
+    nominated_by_text:
+      profile.nominated_by_text ?? nomination?.nominator_name ?? "",
   });
 
   const set = <K extends keyof Values>(k: K, v: Values[K]) =>
@@ -70,8 +74,15 @@ export function ApplyWizard({
           (!selectedClub?.is_other || values.other_club_name?.trim()),
       );
     if (step === 1) return Boolean(values.level && values.format && values.frequency);
-    if (step === 2)
-      return Boolean(values.full_name.trim().length >= 2 && values.whatsapp.trim().length >= 6);
+    if (step === 2) {
+      const li = values.linkedin_url?.trim() ?? "";
+      const liOk = /^https?:\/\/(www\.)?linkedin\.com\//i.test(li);
+      return Boolean(
+        values.full_name.trim().length >= 2 &&
+          values.whatsapp.trim().length >= 6 &&
+          liOk,
+      );
+    }
     if (step === 3) return true;
     return false;
   })();
@@ -79,7 +90,9 @@ export function ApplyWizard({
   function onSubmit() {
     setError(null);
     startTransition(async () => {
-      const res = await submitApplication(values);
+      const res = await submitApplication(values, {
+        nominationId: nomination?.id ?? null,
+      });
       if (!res.ok) setError(res.error);
       // success → server action redirects
     });
@@ -100,6 +113,21 @@ export function ApplyWizard({
       </header>
 
       <main className="flex-1 px-7 pt-9 pb-12 animate-[fadeUp_.35s_ease-out]" key={step}>
+        {nomination && step === 0 && (
+          <div className="mb-6 px-4 py-3 bg-cs-brass/[0.08] border-l-2 border-cs-brass">
+            <div className="text-[9px] tracking-[0.2em] uppercase text-cs-brass mb-1">
+              Nominated by
+            </div>
+            <div className="text-[13px] text-cs-green font-medium">
+              {nomination.nominator_name}
+            </div>
+            {nomination.note && (
+              <div className="text-[12px] italic text-cs-muted mt-1.5 leading-snug">
+                &ldquo;{nomination.note}&rdquo;
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex gap-1.5 mb-7">
           {STEPS.map((_, i) => (
             <div
@@ -327,12 +355,12 @@ function StepContact({
           inputMode="tel"
         />
       </Field>
-      <Field label="LinkedIn URL (optional)">
+      <Field label="LinkedIn profile URL">
         <input
           className="field-input"
           value={values.linkedin_url ?? ""}
           onChange={(e) => set("linkedin_url", e.target.value)}
-          placeholder="https://linkedin.com/in/…"
+          placeholder="https://linkedin.com/in/your-handle"
           inputMode="url"
         />
       </Field>

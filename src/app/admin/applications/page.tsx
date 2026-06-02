@@ -33,6 +33,39 @@ export default async function ApplicationsPage({
     (profiles ?? []).map((p) => [p.id as string, p as unknown as Profile]),
   );
 
+  // Nominations attached to these applicants (so we can show "Nominated by X")
+  const { data: noms } = applicantIds.length
+    ? await supabase
+        .from("nominations")
+        .select("applied_profile_id, nominator_id, note")
+        .in("applied_profile_id", applicantIds)
+    : { data: [] as { applied_profile_id: string; nominator_id: string; note: string | null }[] };
+
+  const nominatorIds = Array.from(
+    new Set((noms ?? []).map((n) => n.nominator_id as string)),
+  );
+  const { data: nominators } = nominatorIds.length
+    ? await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", nominatorIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
+
+  const nominatorById = new Map(
+    (nominators ?? []).map((n) => [n.id as string, n.full_name as string | null]),
+  );
+
+  const nominationByProfile: Record<
+    string,
+    { nominatorName: string | null; note: string | null }
+  > = {};
+  for (const n of noms ?? []) {
+    nominationByProfile[n.applied_profile_id as string] = {
+      nominatorName: nominatorById.get(n.nominator_id as string) ?? null,
+      note: (n.note as string | null) ?? null,
+    };
+  }
+
   const [cityMap, clubMap] = await Promise.all([getCityMap(), getClubMap()]);
 
   return (
@@ -42,6 +75,7 @@ export default async function ApplicationsPage({
       profileById={Object.fromEntries(profileById)}
       cityById={Object.fromEntries(cityMap)}
       clubById={Object.fromEntries(clubMap)}
+      nominationByProfile={nominationByProfile}
     />
   );
 }

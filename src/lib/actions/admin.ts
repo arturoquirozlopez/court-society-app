@@ -104,8 +104,19 @@ export async function reviewApplication(
     }).catch((e) => console.error("[email] sendStatusChange failed:", e));
   }
 
+  // Sync linked nomination's status (if any) so the nominator sees the
+  // outcome on their profile. Match the nomination by applied_profile_id.
+  const nomStatus =
+    v.status === "approved" ? "approved" : "declined";
+  await supabase
+    .from("nominations")
+    .update({ status: nomStatus })
+    .eq("applied_profile_id", app.profile_id as string)
+    .eq("status", "applied");
+
   revalidatePath("/admin/applications");
   revalidatePath("/admin");
+  revalidatePath("/app/profile");
   return { ok: true } as const;
 }
 

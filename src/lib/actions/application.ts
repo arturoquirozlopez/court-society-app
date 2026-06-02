@@ -3,13 +3,19 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { sendApplicationReceived } from "@/lib/email";
 
 const ApplicationSchema = z.object({
   full_name: z.string().min(2, "Your name is required."),
   headline: z.string().max(160).optional().or(z.literal("")),
-  linkedin_url: z.string().url().optional().or(z.literal("")),
+  linkedin_url: z
+    .string()
+    .url("Enter a valid LinkedIn URL.")
+    .refine(
+      (u) => /linkedin\.com\//i.test(u),
+      "URL must be a LinkedIn profile (linkedin.com/in/...)",
+    ),
   whatsapp: z
     .string()
     .min(6, "WhatsApp with country code is required.")
@@ -44,6 +50,7 @@ export type SubmitResult =
 
 export async function submitApplication(
   values: ApplicationFormValues,
+  opts?: { nominationId?: string | null },
 ): Promise<SubmitResult> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -88,6 +95,23 @@ export async function submitApplication(
     .eq("status", "pending");
 
   if (appErr) return { ok: false, error: appErr.message };
+
+  // If the applicant arrived via a nomination link, mark that nomination
+  // as "applied" and connect it to this profile. Done with the service role
+  // because the nominee may not have visibility into the nominations row
+  // until they're approved.
+  if (opts?.nominationId) {
+    const admin = createServiceClient();
+    await admin
+      .from("nominations")
+      .update({
+        status: "applied",
+        applied_profile_id: user.id,
+        applied_at: new Date().toISOString(),
+      })
+      .eq("id", opts.nominationId)
+      .eq("status", "pending");
+  }
 
   // Best-effort transactional email — never block the response on it.
   void sendApplicationReceived({

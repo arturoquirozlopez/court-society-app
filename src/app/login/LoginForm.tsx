@@ -3,7 +3,13 @@
 import { useState, useTransition } from "react";
 import { sendMagicLink } from "@/lib/actions/auth";
 
-export function LoginForm({ initialError }: { initialError?: string }) {
+export function LoginForm({
+  initialError,
+  next,
+}: {
+  initialError?: string;
+  next?: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -12,6 +18,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    if (next) fd.set("next", next);
     startTransition(async () => {
       const res = await sendMagicLink(fd);
       if (!res.ok) setError(res.error);

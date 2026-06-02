@@ -4,7 +4,7 @@ import { Hero } from "@/components/Hero";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: { e?: string };
+  searchParams: { e?: string; next?: string };
 }) {
   return (
     <div className="min-h-dvh flex flex-col">
@@ -26,7 +26,7 @@ export default function LoginPage({
           Court Society is open to members of select private clubs. Your club is your credential.
         </p>
         <div className="w-8 h-px bg-cs-brass my-6" />
-        <LoginForm initialError={searchParams.e} />
+        <LoginForm initialError={searchParams.e} next={searchParams.next} />
       </div>
     </div>
   );

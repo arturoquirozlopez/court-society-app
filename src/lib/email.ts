@@ -213,3 +213,47 @@ export async function sendStatusChange(opts: {
 
   await r.emails.send({ from: FROM, to: opts.to, subject, html });
 }
+
+/**
+ * Nomination invite. Sent to a prospective applicant when an approved
+ * member nominates them through the in-app "Nominate" sheet.
+ */
+export async function sendNominationInvite(opts: {
+  to: string;
+  nomineeName: string;
+  nominatorName: string;
+  note?: string;
+  inviteUrl: string;
+}) {
+  const r = getResend();
+  if (!r) return;
+
+  const nominee = escapeHtml(opts.nomineeName);
+  const nominator = escapeHtml(opts.nominatorName);
+  const greeting = `Dear ${nominee},`;
+
+  let body =
+    paragraph(greeting) +
+    paragraph(
+      `<strong style="color:${COLORS.green};">${nominator}</strong> has nominated you for membership in Court Society — a private network of founders, investors, and operators who play tennis.`,
+    ) +
+    paragraph(
+      "Tap below to complete your application. The Steward&rsquo;s Office reviews every application; you&rsquo;ll hear back within seven days.",
+    );
+
+  if (opts.note) body += reviewerNote(opts.note);
+
+  const html = shell({
+    preheader: `${opts.nominatorName} nominated you for Court Society.`,
+    title: "You have been nominated.",
+    body,
+    cta: { label: "Apply for Membership", url: opts.inviteUrl },
+  });
+
+  await r.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject: `${opts.nominatorName} nominated you for Court Society`,
+    html,
+  });
+}

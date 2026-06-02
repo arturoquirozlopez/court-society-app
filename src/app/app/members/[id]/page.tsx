@@ -9,7 +9,7 @@ import {
   getSeasonStandings,
   getHeadToHead,
 } from "@/lib/queries";
-import { winRate, waLink, fmtDate } from "@/lib/format";
+import { winRate, waLink, fmtDate, linkedinDisplay } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { LEVEL_LABEL, type Profile } from "@/lib/types";
 
@@ -117,6 +117,24 @@ export default async function MemberDetail({ params }: { params: { id: string } 
 
         <h2 className="section-header mt-6">Profile</h2>
         <Row l="Level" v={m.level ? LEVEL_LABEL[m.level] : "—"} />
+        <Row
+          l="LinkedIn"
+          v={(() => {
+            const li = linkedinDisplay(m.linkedin_url);
+            return li ? (
+              <a
+                href={li.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-cs-green underline decoration-cs-brass underline-offset-2 hover:decoration-cs-green"
+              >
+                {li.label}
+              </a>
+            ) : (
+              "—"
+            );
+          })()}
+        />
         <Row l="Member since" v={fmtDate(m.joined_at ?? m.created_at)} />
 
         {m.whatsapp && (

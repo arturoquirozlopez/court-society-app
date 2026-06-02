@@ -43,12 +43,17 @@ export function ApplicationsClient({
   profileById,
   cityById,
   clubById,
+  nominationByProfile,
 }: {
   filter: MemberStatus | "all";
   applications: Application[];
   profileById: Record<string, Profile>;
   cityById: Record<string, { name: string; slug: string }>;
   clubById: Record<string, { name: string; city_id: string; is_other: boolean }>;
+  nominationByProfile: Record<
+    string,
+    { nominatorName: string | null; note: string | null }
+  >;
 }) {
   return (
     <div>
@@ -91,6 +96,7 @@ export function ApplicationsClient({
               payload={payload}
               cityById={cityById}
               clubById={clubById}
+              nomination={nominationByProfile[a.profile_id]}
             />
           );
         })}
@@ -105,12 +111,14 @@ function ApplicationRow({
   payload,
   cityById,
   clubById,
+  nomination,
 }: {
   application: Application;
   profile?: Profile;
   payload: ApplicationPayload;
   cityById: Record<string, { name: string; slug: string }>;
   clubById: Record<string, { name: string; city_id: string; is_other: boolean }>;
+  nomination?: { nominatorName: string | null; note: string | null };
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -153,6 +161,11 @@ function ApplicationRow({
             <span className="text-[13.5px] font-medium">
               {profile?.full_name ?? payload.full_name ?? "—"}
             </span>
+            {nomination?.nominatorName && (
+              <span className="text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 border border-cs-brass text-cs-brass">
+                Nominated by {nomination.nominatorName}
+              </span>
+            )}
           </div>
           <div className="text-[11px] text-cs-muted mt-1">
             {clubName} · {cityName}
@@ -160,6 +173,11 @@ function ApplicationRow({
           <div className="text-[11px] text-cs-muted mt-0.5">
             {profile?.email} · {fmtDate(application.created_at)}
           </div>
+          {nomination?.note && (
+            <div className="text-[11px] italic text-cs-muted mt-1.5 border-l-2 border-cs-brass pl-2 leading-snug">
+              &ldquo;{nomination.note}&rdquo;
+            </div>
+          )}
 
           <button
             onClick={() => setOpen((v) => !v)}
