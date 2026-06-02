@@ -36,6 +36,7 @@ type Chal = {
   note: string | null;
   status: string;
   accepted_by: string | null;
+  target_id: string | null;
   expires_at: string;
   created_at: string;
 };
@@ -222,10 +223,12 @@ export function ChallengesClient({
                 <div className="mt-3 px-4 py-2.5 bg-cs-brass/[0.07] border-l-2 border-cs-brass flex items-center justify-between gap-2">
                   <div>
                     <div className="text-[9px] tracking-wider uppercase text-cs-brass">
-                      Waiting for acceptance
+                      {ch.target_id ? "Direct challenge · waiting" : "Waiting for acceptance"}
                     </div>
                     <div className="text-[12px] text-cs-muted">
-                      First to accept makes the match.
+                      {ch.target_id
+                        ? `Waiting on ${peopleById[ch.target_id]?.full_name ?? "the member you challenged"} to accept or decline.`
+                        : "First to accept makes the match."}
                     </div>
                   </div>
                   <button

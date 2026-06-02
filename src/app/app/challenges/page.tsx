@@ -32,6 +32,7 @@ export default async function ChallengesPage() {
     note: string | null;
     status: string;
     accepted_by: string | null;
+    target_id: string | null;
     expires_at: string;
     created_at: string;
   }[] = [];
@@ -59,7 +60,7 @@ export default async function ChallengesPage() {
   const peopleIds = Array.from(
     new Set(
       challenges
-        .flatMap((c) => [c.author_id, c.accepted_by])
+        .flatMap((c) => [c.author_id, c.accepted_by, c.target_id])
         .filter((x): x is string => Boolean(x) && x !== me.id),
     ),
   );
