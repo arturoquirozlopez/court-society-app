@@ -44,7 +44,7 @@ export default async function ProfilePage() {
     .order("created_at", { ascending: false });
 
   const authorIds = Array.from(
-    new Set((pending ?? []).map((m: { author_id: string }) => m.author_id)),
+    new Set((pending ?? []).map((m) => m.author_id as string)),
   );
   const authors = await getProfilesByIds(authorIds);
   const authorById = new Map(authors.map((a) => [a.id, a] as const));
