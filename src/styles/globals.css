@@ -1,0 +1,58 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+html, body {
+  background: #F5F1E8;
+  color: #0A0A0A;
+  -webkit-font-smoothing: antialiased;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+/* Mobile viewport mimic from prototype */
+.viewport {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+}
+
+/* Re-usable utility classes ported from prototype that map cleanly to Tailwind escape hatches */
+@layer utilities {
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { scrollbar-width: none; }
+}
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp { from { transform: translateY(60px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+
+@layer components {
+  .display-italic { @apply font-display italic font-normal; }
+  .label-eyebrow {
+    @apply text-[9px] tracking-[0.22em] uppercase text-cs-brass;
+  }
+  .btn-primary {
+    @apply w-full py-[15px] bg-cs-green text-cs-ivory text-[10.5px] tracking-[0.2em] uppercase relative;
+  }
+  .btn-primary::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: #A68B5B;
+  }
+  .btn-primary:disabled { @apply bg-neutral-300 cursor-not-allowed; }
+  .btn-primary:disabled::after { background: transparent; }
+  .btn-ghost {
+    @apply w-full py-[14px] bg-transparent text-cs-green border border-cs-green text-[10.5px] tracking-[0.2em] uppercase mt-[10px];
+  }
+  .field-input {
+    @apply w-full py-[11px] bg-transparent border-0 border-b border-black/15 text-[15px] outline-none rounded-none;
+  }
+  .field-input:focus { @apply border-cs-green; }
+  .section-header {
+    @apply text-[9px] tracking-[0.22em] uppercase text-cs-brass pb-2 mb-3 border-b border-black/10;
+  }
+}

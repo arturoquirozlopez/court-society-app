@@ -1,0 +1,28 @@
+# Minimal Supabase CLI config — replace project_id after `supabase link`.
+project_id = ""
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[auth]
+enable_signup = true
+enable_anonymous_sign_ins = false
+site_url = "http://localhost:3000"
+additional_redirect_urls = [
+  "http://localhost:3000/auth/callback",
+  "https://app.courtsociety.org/auth/callback",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+secure_password_change = true
+otp_expiry = 600
+
+[storage]
+file_size_limit = "5MiB"

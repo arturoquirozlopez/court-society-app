@@ -1,0 +1,26 @@
+node_modules
+.next
+.vercel
+out
+dist
+build
+
+# env
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+
+# logs
+*.log
+npm-debug.log*
+
+# editor
+.vscode
+.idea
+
+# supabase
+supabase/.branches
+supabase/.temp
