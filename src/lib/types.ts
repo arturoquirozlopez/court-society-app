@@ -190,3 +190,22 @@ export interface NominationByToken {
   status: NominationStatus;
   expires_at: string;
 }
+
+export interface Group {
+  id: string;
+  name: string;
+  creator_id: string;
+  created_at: string;
+}
+
+export interface GroupMember {
+  group_id: string;
+  profile_id: string;
+  joined_at: string;
+}
+
+/** A group enriched with the caller's membership context. */
+export interface GroupWithContext extends Group {
+  member_ids: string[];
+  is_creator: boolean;
+}

@@ -8,7 +8,7 @@ import {
 } from "@/lib/queries";
 import { Hero } from "@/components/Hero";
 import { RankingClient } from "./RankingClient";
-import type { Profile } from "@/lib/types";
+import type { GroupWithContext, Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,39 @@ export default async function RankingPage() {
   for (const v of vps ?? [])
     visitingByProfile[v.profile_id as string] = v.city_id as string;
 
+  // Groups I belong to (RLS only returns those where I'm a member)
+  const { data: myGroups } = await supabase
+    .from("groups")
+    .select("id, name, creator_id, created_at")
+    .order("created_at", { ascending: false });
+
+  const groupIds = (myGroups ?? []).map((g) => g.id as string);
+  const { data: gmRows } = groupIds.length
+    ? await supabase
+        .from("group_members")
+        .select("group_id, profile_id")
+        .in("group_id", groupIds)
+    : { data: [] as { group_id: string; profile_id: string }[] };
+
+  const memberIdsByGroup = new Map<string, string[]>();
+  for (const row of gmRows ?? []) {
+    const gid = row.group_id as string;
+    const arr = memberIdsByGroup.get(gid) ?? [];
+    arr.push(row.profile_id as string);
+    memberIdsByGroup.set(gid, arr);
+  }
+
+  const groups: GroupWithContext[] = ((myGroups ?? []) as unknown as {
+    id: string;
+    name: string;
+    creator_id: string;
+    created_at: string;
+  }[]).map((g) => ({
+    ...g,
+    member_ids: memberIdsByGroup.get(g.id) ?? [],
+    is_creator: g.creator_id === me.id,
+  }));
+
   const cities = Array.from(cityMap.entries()).map(([id, c]) => ({
     id,
     name: c.name,
@@ -67,6 +100,7 @@ export default async function RankingPage() {
         cities={cities}
         clubs={clubs}
         visitingByProfile={visitingByProfile}
+        groups={groups}
       />
     </div>
   );
