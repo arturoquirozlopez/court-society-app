@@ -5,6 +5,16 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { sendStatusChange } from "@/lib/email";
 
+/**
+ * Discriminated-union return type for admin server actions. Declared
+ * explicitly so the discrimination survives the Server Action boundary
+ * (inferred `as const` literal unions degrade to optional fields when
+ * imported into Client Components, which breaks narrowing in callers).
+ */
+export type ActionResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 const ReviewSchema = z.object({
   applicationId: z.string().uuid(),
   status: z.enum(["approved", "waitlisted", "rejected"]),
@@ -30,7 +40,9 @@ async function requireAdminClient() {
  * (`sync_profile_status_from_application`) mirrors status to profile +
  * sets joined_at on approval. We then fire a Resend status email.
  */
-export async function reviewApplication(input: z.infer<typeof ReviewSchema>) {
+export async function reviewApplication(
+  input: z.infer<typeof ReviewSchema>,
+): Promise<ActionResult> {
   const auth = await requireAdminClient();
   if ("error" in auth) return { ok: false, error: auth.error } as const;
   const { supabase, userId } = auth;
@@ -89,7 +101,9 @@ const RoleSchema = z.object({
  * Only existing admins can promote anyone to admin or demote an admin.
  * Stewards can toggle member ↔ steward but cannot grant admin.
  */
-export async function setMemberRole(input: z.infer<typeof RoleSchema>) {
+export async function setMemberRole(
+  input: z.infer<typeof RoleSchema>,
+): Promise<ActionResult> {
   const auth = await requireAdminClient();
   if ("error" in auth) return { ok: false, error: auth.error } as const;
   const { supabase, role } = auth;
@@ -123,7 +137,7 @@ export async function setMemberRole(input: z.infer<typeof RoleSchema>) {
 }
 
 /** Open a new season; closes the currently active one. */
-export async function openNewSeason(year: number) {
+export async function openNewSeason(year: number): Promise<ActionResult> {
   const auth = await requireAdminClient();
   if ("error" in auth) return { ok: false, error: auth.error } as const;
   if (auth.role !== "admin")
