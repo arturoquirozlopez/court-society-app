@@ -51,7 +51,7 @@ export function SeasonsClient({
           </div>
           <p className="text-[12px] text-cs-muted leading-relaxed">
             Closes the current season and starts a new one. Existing matches are
-            archived under the prior season's id; ranking on the member app
+            archived under the prior season&apos;s id; ranking on the member app
             switches to the new season immediately.
           </p>
           {!confirm ? (

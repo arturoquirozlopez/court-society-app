@@ -363,7 +363,7 @@ function StepTravel({
         {`Where do\nyou land?`}
       </h1>
       <p className="text-[13px] text-cs-muted leading-relaxed mb-7">
-        Select the cities you visit most. We'll surface matches there.
+        Select the cities you visit most. We&apos;ll surface matches there.
       </p>
       <Group label="Cities you travel to">
         <div className="flex flex-wrap gap-2">

@@ -20,7 +20,7 @@ export default async function AdminLayout({
   return (
     <div className="min-h-dvh">
       <header className="bg-cs-green text-cs-ivory px-7 pt-9 pb-5">
-        <div className="label-eyebrow">Steward's Office</div>
+        <div className="label-eyebrow">Steward&apos;s Office</div>
         <div className="flex items-end justify-between mt-2 gap-3">
           <div>
             <h1 className="font-display italic text-[26px] leading-tight">Admin</h1>

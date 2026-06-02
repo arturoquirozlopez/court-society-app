@@ -153,7 +153,7 @@ export default async function ProfilePage() {
             className="block mt-6 text-center btn-ghost"
             style={{ marginTop: 0 }}
           >
-            Open Steward's Office
+            Open Steward&apos;s Office
           </a>
         )}
 
