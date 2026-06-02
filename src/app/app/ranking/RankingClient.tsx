@@ -6,11 +6,13 @@ import { Avatar } from "@/components/Avatar";
 import { winRate } from "@/lib/format";
 import {
   LEVEL_SHORT,
+  type GroupInvitation,
   type GroupWithContext,
   type PlayLevel,
   type Profile,
 } from "@/lib/types";
 import { NewGroupSheet } from "./NewGroupSheet";
+import { GroupInvitations } from "./GroupInvitations";
 import { deleteGroup, leaveGroup } from "@/lib/actions/groups";
 
 type PlayerRow = Profile & { wins: number; losses: number };
@@ -25,6 +27,7 @@ export function RankingClient({
   clubs,
   visitingByProfile,
   groups,
+  invitations,
 }: {
   meId: string;
   meCityId: string | null;
@@ -35,6 +38,7 @@ export function RankingClient({
   clubs: { id: string; name: string; city_id: string }[];
   visitingByProfile: Record<string, string>;
   groups: GroupWithContext[];
+  invitations: GroupInvitation[];
 }) {
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
@@ -114,6 +118,9 @@ export function RankingClient({
 
   return (
     <>
+      {/* Pending group invitations */}
+      <GroupInvitations invitations={invitations} />
+
       {/* Groups row — always rendered, even when empty */}
       <div className="flex gap-1.5 px-7 py-3 overflow-x-auto border-b border-black/10 scrollbar-none items-center">
         <button

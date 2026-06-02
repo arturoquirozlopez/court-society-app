@@ -55,6 +55,7 @@ export async function createGroup(
         otherMembers.map((profile_id) => ({
           group_id: group.id,
           profile_id,
+          status: "pending",
         })),
       );
     if (insertErr) {
@@ -110,7 +111,7 @@ export async function leaveGroup(groupId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Add members to an existing group (creator only). */
+/** Add members to an existing group (creator only). Each invitee starts pending. */
 export async function addGroupMembers(
   groupId: string,
   memberIds: string[],
@@ -120,8 +121,50 @@ export async function addGroupMembers(
   const { error } = await supabase
     .from("group_members")
     .insert(
-      memberIds.map((profile_id) => ({ group_id: groupId, profile_id })),
+      memberIds.map((profile_id) => ({
+        group_id: groupId,
+        profile_id,
+        status: "pending",
+      })),
     );
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/app/ranking");
+  return { ok: true };
+}
+
+/** Accept an invitation. Invitee flips their own pending row → accepted. */
+export async function acceptGroupInvitation(
+  groupId: string,
+): Promise<ActionResult> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase
+    .from("group_members")
+    .update({ status: "accepted" })
+    .eq("group_id", groupId)
+    .eq("profile_id", user.id)
+    .eq("status", "pending");
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/app/ranking");
+  return { ok: true };
+}
+
+/** Decline an invitation. Invitee deletes their own pending row. */
+export async function declineGroupInvitation(
+  groupId: string,
+): Promise<ActionResult> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("profile_id", user.id)
+    .eq("status", "pending");
   if (error) return { ok: false, error: error.message };
   revalidatePath("/app/ranking");
   return { ok: true };

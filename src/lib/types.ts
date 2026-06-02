@@ -198,14 +198,26 @@ export interface Group {
   created_at: string;
 }
 
+export type GroupMemberStatus = "pending" | "accepted";
+
 export interface GroupMember {
   group_id: string;
   profile_id: string;
+  status: GroupMemberStatus;
   joined_at: string;
 }
 
 /** A group enriched with the caller's membership context. */
 export interface GroupWithContext extends Group {
-  member_ids: string[];
+  member_ids: string[]; // accepted members only
   is_creator: boolean;
+}
+
+/** A pending invitation surfaced to the invitee. */
+export interface GroupInvitation {
+  group_id: string;
+  group_name: string;
+  inviter_id: string;
+  inviter_name: string | null;
+  invited_at: string;
 }

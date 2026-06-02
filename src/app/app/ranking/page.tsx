@@ -4,11 +4,16 @@ import {
   getActiveSeason,
   getCityMap,
   getClubMap,
+  getProfilesByIds,
   getSeasonStandings,
 } from "@/lib/queries";
 import { Hero } from "@/components/Hero";
 import { RankingClient } from "./RankingClient";
-import type { GroupWithContext, Profile } from "@/lib/types";
+import type {
+  GroupInvitation,
+  GroupWithContext,
+  Profile,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -42,37 +47,80 @@ export default async function RankingPage() {
   for (const v of vps ?? [])
     visitingByProfile[v.profile_id as string] = v.city_id as string;
 
-  // Groups I belong to (RLS only returns those where I'm a member)
-  const { data: myGroups } = await supabase
+  // All groups I'm in (any status), via RLS
+  const { data: groupsData } = await supabase
     .from("groups")
     .select("id, name, creator_id, created_at")
     .order("created_at", { ascending: false });
 
-  const groupIds = (myGroups ?? []).map((g) => g.id as string);
-  const { data: gmRows } = groupIds.length
+  const groupIds = (groupsData ?? []).map((g) => g.id as string);
+
+  // My membership status per group + all-accepted member ids per group
+  const { data: myMemberships } = groupIds.length
     ? await supabase
         .from("group_members")
-        .select("group_id, profile_id")
+        .select("group_id, status, joined_at")
+        .eq("profile_id", me.id)
+    : { data: [] as { group_id: string; status: string; joined_at: string }[] };
+
+  const myStatusByGroup = new Map<string, { status: string; joined_at: string }>();
+  for (const m of myMemberships ?? [])
+    myStatusByGroup.set(m.group_id as string, {
+      status: m.status as string,
+      joined_at: m.joined_at as string,
+    });
+
+  // Member ids per group (only accepted, RLS already enforces this when I'm accepted)
+  const { data: allMembers } = groupIds.length
+    ? await supabase
+        .from("group_members")
+        .select("group_id, profile_id, status")
         .in("group_id", groupIds)
-    : { data: [] as { group_id: string; profile_id: string }[] };
+        .eq("status", "accepted")
+    : { data: [] as { group_id: string; profile_id: string; status: string }[] };
 
   const memberIdsByGroup = new Map<string, string[]>();
-  for (const row of gmRows ?? []) {
+  for (const row of allMembers ?? []) {
     const gid = row.group_id as string;
     const arr = memberIdsByGroup.get(gid) ?? [];
     arr.push(row.profile_id as string);
     memberIdsByGroup.set(gid, arr);
   }
 
-  const groups: GroupWithContext[] = ((myGroups ?? []) as unknown as {
+  // Split into joined groups vs pending invitations
+  const acceptedGroups: GroupWithContext[] = [];
+  const pendingGroupRows: typeof groupsData = [];
+  for (const g of (groupsData ?? []) as unknown as {
     id: string;
     name: string;
     creator_id: string;
     created_at: string;
-  }[]).map((g) => ({
-    ...g,
-    member_ids: memberIdsByGroup.get(g.id) ?? [],
-    is_creator: g.creator_id === me.id,
+  }[]) {
+    const ms = myStatusByGroup.get(g.id);
+    if (ms?.status === "accepted") {
+      acceptedGroups.push({
+        ...g,
+        member_ids: memberIdsByGroup.get(g.id) ?? [],
+        is_creator: g.creator_id === me.id,
+      });
+    } else if (ms?.status === "pending") {
+      pendingGroupRows.push(g);
+    }
+  }
+
+  // Hydrate inviter names for pending invitations
+  const inviterIds = Array.from(
+    new Set(pendingGroupRows.map((g) => g.creator_id as string)),
+  );
+  const inviters = await getProfilesByIds(inviterIds);
+  const inviterById = new Map(inviters.map((p) => [p.id, p] as const));
+
+  const invitations: GroupInvitation[] = pendingGroupRows.map((g) => ({
+    group_id: g.id as string,
+    group_name: g.name as string,
+    inviter_id: g.creator_id as string,
+    inviter_name: inviterById.get(g.creator_id as string)?.full_name ?? null,
+    invited_at: myStatusByGroup.get(g.id as string)?.joined_at ?? g.created_at as string,
   }));
 
   const cities = Array.from(cityMap.entries()).map(([id, c]) => ({
@@ -100,7 +148,8 @@ export default async function RankingPage() {
         cities={cities}
         clubs={clubs}
         visitingByProfile={visitingByProfile}
-        groups={groups}
+        groups={acceptedGroups}
+        invitations={invitations}
       />
     </div>
   );
