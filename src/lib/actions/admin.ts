@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { sendStatusChange } from "@/lib/email";
 
 /**
@@ -187,4 +187,129 @@ export async function openNewSeason(year: number): Promise<ActionResult> {
   revalidatePath("/admin/seasons");
   revalidatePath("/app/ranking");
   return { ok: true } as const;
+}
+
+/* ────────── Admin: groups override ────────── */
+
+/**
+ * Admin can delete any group regardless of who created it. Uses the service
+ * client because the default RLS only lets the creator delete their own group.
+ */
+export async function adminDeleteGroup(groupId: string): Promise<ActionResult> {
+  const auth = await requireAdminClient();
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const svc = createServiceClient();
+  const { error } = await svc.from("groups").delete().eq("id", groupId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/groups");
+  return { ok: true };
+}
+
+/* ────────── Admin: cities & clubs CRUD ────────── */
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+const CityInput = z.object({
+  name: z.string().trim().min(2).max(80),
+});
+
+export async function createCity(
+  input: z.infer<typeof CityInput>,
+): Promise<ActionResult> {
+  const auth = await requireAdminClient();
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const parsed = CityInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid input." };
+  const slug = slugify(parsed.data.name);
+  if (!slug) return { ok: false, error: "Name produces empty slug." };
+  const { error } = await auth.supabase
+    .from("cities")
+    .insert({ name: parsed.data.name, slug });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/locations");
+  revalidatePath("/apply");
+  return { ok: true };
+}
+
+export async function updateCity(
+  id: string,
+  patch: { name?: string; active?: boolean },
+): Promise<ActionResult> {
+  const auth = await requireAdminClient();
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const updates: Record<string, unknown> = {};
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (name.length < 2) return { ok: false, error: "Name too short." };
+    updates.name = name;
+  }
+  if (patch.active !== undefined) updates.active = patch.active;
+  if (Object.keys(updates).length === 0) return { ok: true };
+  const { error } = await auth.supabase
+    .from("cities")
+    .update(updates)
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/locations");
+  revalidatePath("/apply");
+  return { ok: true };
+}
+
+const ClubInput = z.object({
+  city_id: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+});
+
+export async function createClub(
+  input: z.infer<typeof ClubInput>,
+): Promise<ActionResult> {
+  const auth = await requireAdminClient();
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const parsed = ClubInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid input." };
+  const slug = slugify(parsed.data.name);
+  if (!slug) return { ok: false, error: "Name produces empty slug." };
+  const { error } = await auth.supabase
+    .from("clubs")
+    .insert({
+      city_id: parsed.data.city_id,
+      name: parsed.data.name,
+      slug,
+    });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/locations");
+  revalidatePath("/apply");
+  return { ok: true };
+}
+
+export async function updateClub(
+  id: string,
+  patch: { name?: string; active?: boolean },
+): Promise<ActionResult> {
+  const auth = await requireAdminClient();
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const updates: Record<string, unknown> = {};
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (name.length < 2) return { ok: false, error: "Name too short." };
+    updates.name = name;
+  }
+  if (patch.active !== undefined) updates.active = patch.active;
+  if (Object.keys(updates).length === 0) return { ok: true };
+  const { error } = await auth.supabase
+    .from("clubs")
+    .update(updates)
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/locations");
+  revalidatePath("/apply");
+  return { ok: true };
 }
