@@ -5,10 +5,23 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveSeason } from "@/lib/queries";
 
+/**
+ * Standardised score format: each set is a "G-G" pair separated by spaces.
+ * Example: "6-4"  ·  "6-4 7-5"  ·  "6-4 3-6 9-7".  The regex accepts 1 to 3
+ * sets, each game count 0–9 (loose enough for long deciding sets), plus an
+ * optional tiebreak suffix "(10-7)".
+ */
+const SCORE_RE = /^[0-9]-[0-9]( [0-9]-[0-9]){0,2}(\(\d{1,2}-\d{1,2}\))?$/;
+
 const NewMatch = z.object({
   opponent_id: z.string().uuid(),
   author_result: z.enum(["W", "L"]),
-  score: z.string().max(40).optional().or(z.literal("")),
+  score: z
+    .string()
+    .max(40)
+    .refine((s) => s === "" || SCORE_RE.test(s), "Invalid score format.")
+    .optional()
+    .or(z.literal("")),
   note: z.string().max(500).optional().or(z.literal("")),
 });
 

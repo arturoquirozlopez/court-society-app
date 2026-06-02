@@ -118,8 +118,11 @@ export function RankingClient({
 
   return (
     <>
-      {/* Pending group invitations */}
-      <GroupInvitations invitations={invitations} />
+      {/* Group invitations are surfaced in the Profile inbox (see PendingInbox).
+          Suppressed here to avoid duplication. */}
+      {invitations.length > 0 && (
+        <GroupInvitations invitations={invitations} />
+      )}
 
       {/* Groups row — always rendered, even when empty */}
       <div className="flex gap-1.5 px-7 py-3 overflow-x-auto border-b border-black/10 scrollbar-none items-center">

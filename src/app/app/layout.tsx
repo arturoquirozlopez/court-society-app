@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 /**
- * Member-app shell. Forces approved status, fetches pending-match count
- * for the notification dot, and renders the bottom tab bar.
+ * Member-app shell. Forces approved status, totals all items needing the
+ * member's reply (match confirmations + group invitations) for the
+ * notification dot on the Profile tab.
  */
 export default async function AppLayout({
   children,
@@ -16,16 +17,23 @@ export default async function AppLayout({
   const me = await requireApproved();
 
   const supabase = createClient();
-  const { count } = await supabase
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("opponent_id", me.id)
-    .eq("status", "pending");
+  const [{ count: matches }, { count: invites }] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("opponent_id", me.id)
+      .eq("status", "pending"),
+    supabase
+      .from("group_members")
+      .select("group_id", { count: "exact", head: true })
+      .eq("profile_id", me.id)
+      .eq("status", "pending"),
+  ]);
 
   return (
     <div className="min-h-dvh flex flex-col">
       <main className="flex-1 pb-[88px]">{children}</main>
-      <BottomTabs pendingConfirmations={count ?? 0} />
+      <BottomTabs pendingReplies={(matches ?? 0) + (invites ?? 0)} />
     </div>
   );
 }

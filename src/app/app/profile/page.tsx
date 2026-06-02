@@ -17,10 +17,10 @@ import { winRate, fmtDate, linkedinDisplay } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { SignOutLink } from "@/components/SignOutLink";
 import { ProfileEditor } from "./ProfileEditor";
-import { PendingConfirmations } from "./PendingConfirmations";
+import { PendingInbox } from "./PendingInbox";
 import { NominateButton } from "./NominateButton";
 import { MyNominations } from "./MyNominations";
-import type { Nomination } from "@/lib/types";
+import type { Match, Nomination } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +59,45 @@ export default async function ProfilePage() {
     .eq("nominator_id", me.id)
     .order("created_at", { ascending: false });
   const myNominations = (nominationsData ?? []) as unknown as Nomination[];
+
+  // Group invitations addressed to me (pending only)
+  const { data: pendingGmRows } = await supabase
+    .from("group_members")
+    .select("group_id, joined_at, status")
+    .eq("profile_id", me.id)
+    .eq("status", "pending");
+
+  const pendingGroupIds = (pendingGmRows ?? []).map(
+    (r) => r.group_id as string,
+  );
+  const { data: pendingGroups } = pendingGroupIds.length
+    ? await supabase
+        .from("groups")
+        .select("id, name, creator_id")
+        .in("id", pendingGroupIds)
+    : { data: [] as { id: string; name: string; creator_id: string }[] };
+
+  const pendingInviterIds = Array.from(
+    new Set((pendingGroups ?? []).map((g) => g.creator_id as string)),
+  );
+  const pendingInviters = await getProfilesByIds(pendingInviterIds);
+  const pendingInviterById = new Map(
+    pendingInviters.map((p) => [p.id, p] as const),
+  );
+
+  const groupInvitations = (pendingGroups ?? []).map((g) => {
+    const gmRow = (pendingGmRows ?? []).find(
+      (r) => r.group_id === g.id,
+    );
+    return {
+      group_id: g.id as string,
+      group_name: g.name as string,
+      inviter_id: g.creator_id as string,
+      inviter_name:
+        pendingInviterById.get(g.creator_id as string)?.full_name ?? null,
+      invited_at: (gmRow?.joined_at as string) ?? new Date().toISOString(),
+    };
+  });
 
   const cityName = me.home_city_id ? cityMap.get(me.home_city_id)?.name ?? "—" : "—";
   const clubName = me.home_club_id
@@ -106,6 +145,13 @@ export default async function ProfilePage() {
         </div>
       </div>
 
+      {/* Unified inbox at the top — confirmations + invitations */}
+      <PendingInbox
+        matchConfirmations={(pending ?? []) as unknown as Match[]}
+        authorById={authorById}
+        groupInvitations={groupInvitations}
+      />
+
       <div className="px-7 pt-6">
         {/* Club badge */}
         <div className="flex items-center gap-2.5 px-4 py-3.5 bg-cs-green text-cs-ivory border-l-2 border-cs-brass mb-5">
@@ -134,13 +180,6 @@ export default async function ProfilePage() {
             </div>
           ))}
         </div>
-
-        {pending && pending.length > 0 && (
-          <PendingConfirmations
-            pending={pending as never}
-            authorById={authorById as never}
-          />
-        )}
 
         {/* Editor */}
         <ProfileEditor

@@ -28,10 +28,34 @@ export function LogMatchFab({
   const [filter, setFilter] = useState<Filter>("myclub");
   const [rival, setRival] = useState<Member | null>(null);
   const [result, setResult] = useState<"W" | "L" | null>(null);
-  const [score, setScore] = useState("");
+  const [sets, setSets] = useState<{ a: string; b: string }[]>([
+    { a: "", b: "" },
+    { a: "", b: "" },
+    { a: "", b: "" },
+  ]);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  function setSet(i: number, side: "a" | "b", v: string) {
+    // accept a single digit 0-9
+    const cleaned = v.replace(/[^0-9]/g, "").slice(0, 1);
+    setSets((prev) => prev.map((s, idx) => (idx === i ? { ...s, [side]: cleaned } : s)));
+  }
+
+  const score = useMemo(
+    () =>
+      sets
+        .filter((s) => s.a !== "" && s.b !== "")
+        .map((s) => `${s.a}-${s.b}`)
+        .join(" "),
+    [sets],
+  );
+
+  const scoreValid = useMemo(() => {
+    const completed = sets.filter((s) => s.a !== "" && s.b !== "");
+    return completed.length >= 1 && completed.length <= 3;
+  }, [sets]);
 
   const filtered = useMemo(() => {
     return allMembers.filter((m) => {
@@ -56,7 +80,11 @@ export function LogMatchFab({
         setOpen(false);
         setRival(null);
         setResult(null);
-        setScore("");
+        setSets([
+          { a: "", b: "" },
+          { a: "", b: "" },
+          { a: "", b: "" },
+        ]);
         setNote("");
       }
     });
@@ -155,12 +183,51 @@ export function LogMatchFab({
           </button>
         </div>
 
-        <input
-          className="field-input text-center my-3.5"
-          placeholder="Score  e.g. 6–4  3–6  7–5"
-          value={score}
-          onChange={(e) => setScore(e.target.value)}
-        />
+        <label className="block text-[10px] tracking-[0.12em] uppercase text-cs-muted mb-2 mt-1">
+          Score · sets
+        </label>
+        <div className="space-y-2 mb-4">
+          {sets.map((s, i) => {
+            const optional = i >= 1;
+            return (
+              <div key={i} className="flex items-center gap-3">
+                <span className="text-[10px] tracking-[0.15em] uppercase text-cs-muted w-12">
+                  Set {i + 1}
+                  {optional ? "*" : ""}
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={s.a}
+                  onChange={(e) => setSet(i, "a", e.target.value)}
+                  placeholder="—"
+                  className="w-11 h-11 border border-black/15 text-center text-[18px] font-display text-cs-green focus:border-cs-green outline-none bg-transparent"
+                />
+                <span className="text-[14px] text-cs-muted">–</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={s.b}
+                  onChange={(e) => setSet(i, "b", e.target.value)}
+                  placeholder="—"
+                  className="w-11 h-11 border border-black/15 text-center text-[18px] font-display text-cs-green focus:border-cs-green outline-none bg-transparent"
+                />
+                <span className="text-[10px] text-cs-muted">
+                  {result === "W" ? "you · them" : "you · them"}
+                </span>
+              </div>
+            );
+          })}
+          <div className="text-[10px] text-cs-muted leading-snug">
+            * Sets 2 and 3 optional · 0–9 games per set · examples: 6–4 · 6–4 7–5 · 6–4 3–6 9–7
+          </div>
+          {score && (
+            <div className="text-[11px] tracking-[0.1em] uppercase text-cs-brass pt-1">
+              Final: {score.replace(/-/g, "–")}
+            </div>
+          )}
+        </div>
+
         <textarea
           className="field-input min-h-[60px] resize-none"
           placeholder="Note (optional)"
@@ -172,7 +239,7 @@ export function LogMatchFab({
 
         <button
           onClick={submit}
-          disabled={!rival || !result || pending}
+          disabled={!rival || !result || !scoreValid || pending}
           className="btn-primary mt-3.5"
         >
           {pending ? "Saving…" : "Save match"}

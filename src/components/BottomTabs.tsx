@@ -12,16 +12,17 @@ const TABS = [
 ] as const;
 
 export function BottomTabs({
-  pendingConfirmations = 0,
+  pendingReplies = 0,
 }: {
-  pendingConfirmations?: number;
+  /** Count of things needing the member's reply (confirms + invites). */
+  pendingReplies?: number;
 }) {
   const pathname = usePathname();
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-viewport bg-cs-ivory border-t border-black/10 flex z-20">
       {TABS.map((t) => {
         const active = pathname?.startsWith(t.href);
-        const showDot = t.href === "/app/h2h" && pendingConfirmations > 0;
+        const showDot = t.href === "/app/profile" && pendingReplies > 0;
         return (
           <Link
             key={t.href}
@@ -42,7 +43,9 @@ export function BottomTabs({
               {t.label}
             </span>
             {showDot && (
-              <span className="absolute top-[6px] right-[24%] w-2 h-2 rounded-full bg-[#E05252] border-2 border-cs-ivory" />
+              <span className="absolute top-[6px] right-[24%] min-w-[16px] h-4 px-1 rounded-full bg-[#E05252] border-2 border-cs-ivory flex items-center justify-center text-[9px] font-medium text-white">
+                {pendingReplies > 9 ? "9+" : pendingReplies}
+              </span>
             )}
           </Link>
         );
