@@ -24,6 +24,7 @@ export function MembersClient({
 }) {
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [clubFilter, setClubFilter] = useState<string>("all");
+  const [search, setSearch] = useState<string>("");
 
   const clubsForCity = useMemo(
     () => (cityFilter === "all" ? [] : clubs.filter((c) => c.city_id === cityFilter)),
@@ -31,7 +32,10 @@ export function MembersClient({
   );
 
   const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
     return members.filter((m) => {
+      if (needle && !(m.full_name ?? "").toLowerCase().includes(needle))
+        return false;
       if (cityFilter !== "all") {
         const isHome = m.home_city_id === cityFilter;
         const isVisiting = visitingByProfile[m.id] === cityFilter;
@@ -40,7 +44,7 @@ export function MembersClient({
       if (clubFilter !== "all" && m.home_club_id !== clubFilter) return false;
       return true;
     });
-  }, [members, cityFilter, clubFilter, visitingByProfile]);
+  }, [members, cityFilter, clubFilter, visitingByProfile, search]);
 
   const cityName = (id: string) => cities.find((c) => c.id === id)?.name ?? "";
   const clubName = (id: string | null) =>
@@ -48,6 +52,17 @@ export function MembersClient({
 
   return (
     <>
+      {/* Name search */}
+      <div className="px-7 py-3 border-b border-black/10">
+        <input
+          className="field-input text-[14px]"
+          placeholder="Search by name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoComplete="off"
+        />
+      </div>
+
       {/* City filter */}
       <div className="flex gap-1.5 px-7 py-3 overflow-x-auto border-b border-black/10 scrollbar-none">
         <Chip

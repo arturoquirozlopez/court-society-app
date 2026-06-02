@@ -89,10 +89,19 @@ export default async function ChallengesPage() {
 
   const activeCityName = activeCityId ? cityMap.get(activeCityId)?.name ?? "" : "Select your city";
 
+  // Approved members (excluding self) — for the target-picker search in the
+  // New challenge sheet.
+  const { data: candidates } = await supabase
+    .from("profiles")
+    .select("id, full_name, photo_url, home_city_id, home_club_id")
+    .eq("status", "approved")
+    .neq("id", me.id)
+    .order("full_name");
+
   return (
     <div>
       <Hero
-        title={<>Retos</>}
+        title={<>Challenges</>}
         subtitle={`${activeCityName} · ${challenges.length} active`}
       />
       <ChallengesClient
@@ -105,6 +114,7 @@ export default async function ChallengesPage() {
         challenges={challenges}
         clubsByChallenge={clubsByChallenge}
         peopleById={peopleById}
+        targetCandidates={(candidates ?? []) as never}
       />
     </div>
   );

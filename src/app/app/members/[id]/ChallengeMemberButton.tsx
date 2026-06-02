@@ -80,7 +80,7 @@ export function ChallengeMemberButton({
         open={open}
         onClose={() => setOpen(false)}
         title={`Challenge ${targetName.split(" ")[0]}`}
-        subtitle={`A direct reto — only ${targetName.split(" ")[0]} will see it. 72-hour window.`}
+        subtitle={`A direct challenge — only ${targetName.split(" ")[0]} will see it. 72-hour window.`}
       >
         {sent ? (
           <div className="text-center py-6">
@@ -92,7 +92,7 @@ export function ChallengeMemberButton({
             </h3>
             <p className="text-[13px] text-cs-muted leading-relaxed mb-6">
               {targetName.split(" ")[0]} has 72 hours to accept or decline.
-              You&rsquo;ll see it on the Retos tab and they&rsquo;ll get an
+              You&rsquo;ll see it on the Challenges tab and they&rsquo;ll get an
               email.
             </p>
             <button onClick={() => setOpen(false)} className="btn-ghost" style={{ marginTop: 0 }}>

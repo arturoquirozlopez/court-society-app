@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Sheet } from "@/components/Sheet";
 import {
@@ -18,6 +18,14 @@ import {
   type PlayLevel,
   type Profile,
 } from "@/lib/types";
+
+type TargetCandidate = {
+  id: string;
+  full_name: string | null;
+  photo_url: string | null;
+  home_city_id: string | null;
+  home_club_id: string | null;
+};
 
 type Chal = {
   id: string;
@@ -42,6 +50,7 @@ export function ChallengesClient({
   challenges,
   clubsByChallenge,
   peopleById,
+  targetCandidates,
 }: {
   meId: string;
   meLevel: PlayLevel | null;
@@ -52,6 +61,7 @@ export function ChallengesClient({
   challenges: Chal[];
   clubsByChallenge: Record<string, string[]>;
   peopleById: Record<string, Profile>;
+  targetCandidates: TargetCandidate[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -62,24 +72,39 @@ export function ChallengesClient({
   const [format, setFormat] = useState<PlayFormat>("singles");
   const [clubIds, setClubIds] = useState<string[]>([]);
   const [note, setNote] = useState("");
+  const [target, setTarget] = useState<TargetCandidate | null>(null);
+  const [targetSearch, setTargetSearch] = useState("");
 
   const cityClubs = clubs.filter((c) => c.city_id === cityId);
+
+  const targetMatches = useMemo(() => {
+    const needle = targetSearch.trim().toLowerCase();
+    if (needle.length < 2) return [];
+    return targetCandidates
+      .filter((c) => (c.full_name ?? "").toLowerCase().includes(needle))
+      .slice(0, 6);
+  }, [targetSearch, targetCandidates]);
 
   function submit() {
     setError(null);
     start(async () => {
+      // If a target is set, force the city/level to match theirs for clarity;
+      // they need to be the recipient, otherwise it falls back to open.
       const res = await createChallenge({
-        city_id: cityId,
+        city_id: target?.home_city_id ?? cityId,
         level,
         format,
         club_ids: clubIds,
         note,
+        target_id: target?.id,
       });
       if (!res.ok) setError(res.error);
       else {
         setOpen(false);
         setClubIds([]);
         setNote("");
+        setTarget(null);
+        setTargetSearch("");
       }
     });
   }
@@ -130,7 +155,7 @@ export function ChallengesClient({
                 </div>
                 {ismine && (
                   <span className="text-[9px] tracking-wider uppercase text-cs-brass px-2 py-0.5 border border-cs-brass/40">
-                    Your reto
+                    Your challenge
                   </span>
                 )}
               </header>
@@ -271,28 +296,105 @@ export function ChallengesClient({
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title="New reto"
-        subtitle="Broadcast a match — first to accept makes the game."
+        title="New challenge"
+        subtitle={
+          target
+            ? `Direct to ${target.full_name?.split(" ")[0] ?? "a member"} — only they will see it.`
+            : "Broadcast a match — first to accept makes the game."
+        }
       >
-        <Field label="City">
-          <select
-            className="field-input"
-            value={cityId}
-            onChange={(e) => {
-              setCityId(e.target.value);
-              setClubIds([]);
-            }}
-          >
-            <option value="">—</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+        {/* Target picker */}
+        <Field label="Challenge someone specific (optional)">
+          {target ? (
+            <div className="flex items-center gap-3 p-2.5 bg-cs-brass/[0.08] border-l-2 border-cs-brass">
+              <Avatar
+                url={target.photo_url}
+                seed={target.id}
+                alt={target.full_name ?? ""}
+                size={32}
+              />
+              <span className="flex-1 text-[13px] font-medium truncate">
+                {target.full_name}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setTarget(null);
+                  setTargetSearch("");
+                }}
+                className="text-[10px] tracking-[0.12em] uppercase text-cs-muted hover:text-cs-loss"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <>
+              <input
+                className="field-input"
+                placeholder="Search a member by name (min. 2 chars)"
+                value={targetSearch}
+                onChange={(e) => setTargetSearch(e.target.value)}
+              />
+              {targetMatches.length > 0 && (
+                <ul className="mt-2 border border-black/10">
+                  {targetMatches.map((m) => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTarget(m);
+                          setTargetSearch("");
+                        }}
+                        className="flex items-center gap-3 px-3 py-2 w-full text-left border-b border-black/5 hover:bg-cs-green/[0.04]"
+                      >
+                        <Avatar
+                          url={m.photo_url}
+                          seed={m.id}
+                          alt={m.full_name ?? ""}
+                          size={28}
+                        />
+                        <span className="text-[13px] truncate">
+                          {m.full_name}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {targetSearch.trim().length >= 2 && targetMatches.length === 0 && (
+                <p className="text-[11px] text-cs-muted mt-2">
+                  No members match.
+                </p>
+              )}
+              <p className="text-[11px] text-cs-muted mt-2 leading-snug">
+                Leave empty for an open challenge in your city. Direct
+                challenges go to a single member&rsquo;s inbox by email.
+              </p>
+            </>
+          )}
         </Field>
 
-        {cityId && (
+        {!target && (
+          <Field label="City">
+            <select
+              className="field-input"
+              value={cityId}
+              onChange={(e) => {
+                setCityId(e.target.value);
+                setClubIds([]);
+              }}
+            >
+              <option value="">—</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {!target && cityId && (
           <Field label="Preferred clubs (pick any)">
             {cityClubs.map((cl) => {
               const on = clubIds.includes(cl.id);
@@ -359,10 +461,14 @@ export function ChallengesClient({
         {error && <p className="text-[12px] text-cs-loss mb-2">{error}</p>}
         <button
           onClick={submit}
-          disabled={!cityId || pending}
+          disabled={(!target && !cityId) || pending}
           className="btn-primary"
         >
-          {pending ? "Posting…" : "Post challenge"}
+          {pending
+            ? "Sending…"
+            : target
+              ? `Challenge ${target.full_name?.split(" ")[0] ?? "this member"}`
+              : "Post challenge"}
         </button>
         <button
           onClick={() => setOpen(false)}
