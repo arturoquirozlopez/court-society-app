@@ -154,7 +154,7 @@ export function MembersClient({
         {filtered.length === 0 && (
           <li className="px-7 py-12 text-center">
             <div className="font-display italic text-[18px] text-cs-green">
-              No members match.
+              No members match
             </div>
           </li>
         )}
