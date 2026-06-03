@@ -136,6 +136,12 @@ export function MembersClient({
                   </div>
                   <div className="text-[10px] text-cs-brass mt-0.5 truncate">
                     {clubName(m.home_club_id)}
+                    {m.home_city_id ? (
+                      <span className="text-cs-muted">
+                        {" "}
+                        · {cityName(m.home_city_id)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <span className="text-[9.5px] tracking-wider uppercase text-cs-muted bg-black/5 px-2 py-0.5">
