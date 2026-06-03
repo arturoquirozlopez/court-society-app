@@ -66,6 +66,21 @@ export default async function H2hPage() {
   const opponentProfiles = await getProfilesByIds(opponentIds);
   const opponentById = new Map(opponentProfiles.map((p) => [p.id, p] as const));
 
+  // Count existing matches between me and each opponent so the picker can
+  // tell the user "this will be #3 vs Pablo".
+  const { data: pastMatches } = await supabase
+    .from("matches")
+    .select("author_id, opponent_id")
+    .or(`author_id.eq.${me.id},opponent_id.eq.${me.id}`);
+  const countByOpponent = new Map<string, number>();
+  for (const row of (pastMatches ?? []) as {
+    author_id: string;
+    opponent_id: string;
+  }[]) {
+    const otherId = row.author_id === me.id ? row.opponent_id : row.author_id;
+    countByOpponent.set(otherId, (countByOpponent.get(otherId) ?? 0) + 1);
+  }
+
   const playable: PlayableChallenge[] = playableRows.map((c) => {
     const oppId = c.author_id === me.id ? (c.accepted_by as string) : c.author_id;
     const opp = opponentById.get(oppId);
@@ -76,6 +91,7 @@ export default async function H2hPage() {
       opponent_photo: opp?.photo_url ?? null,
       city_name: cityMap.get(c.city_id)?.name ?? "—",
       format: c.format as "singles" | "doubles" | "both",
+      next_match_number: (countByOpponent.get(oppId) ?? 0) + 1,
     };
   });
 

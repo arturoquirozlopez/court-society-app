@@ -13,6 +13,8 @@ export type PlayableChallenge = {
   opponent_photo: string | null;
   city_name: string;
   format: PlayFormat;
+  /** The match number this challenge will produce (`1` if first ever vs opponent). */
+  next_match_number: number;
 };
 
 export function LogMatchFab({ playable }: { playable: PlayableChallenge[] }) {
@@ -96,7 +98,11 @@ export function LogMatchFab({ playable }: { playable: PlayableChallenge[] }) {
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title={chosen ? `Log match vs ${chosen.opponent_name?.split(" ")[0] ?? "opponent"}` : "Log a match"}
+        title={
+          chosen
+            ? `Match #${chosen.next_match_number} vs ${chosen.opponent_name?.split(" ")[0] ?? "opponent"}`
+            : "Log a match"
+        }
         subtitle={
           chosen
             ? `${FORMAT_LABEL[chosen.format]} · ${chosen.city_name}`
@@ -132,6 +138,9 @@ export function LogMatchFab({ playable }: { playable: PlayableChallenge[] }) {
                     onClick={() => setChosen(p)}
                     className="flex items-center gap-3 w-full text-left px-3 py-3 border-b border-black/5 hover:bg-cs-green/[0.04]"
                   >
+                    <span className="font-display text-[18px] text-cs-brass min-w-[34px] text-center">
+                      #{p.next_match_number}
+                    </span>
                     <Avatar
                       url={p.opponent_photo}
                       seed={p.opponent_id}
