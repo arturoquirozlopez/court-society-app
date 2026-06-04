@@ -9,6 +9,7 @@ import {
   getClubMap,
   getSeasonRanking,
 } from "@/lib/queries";
+import { touchLastSeen } from "@/lib/last-seen";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,10 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const me = await requireApproved();
+
+  // Fire-and-forget heartbeat. Debounced inside the helper so we only write
+  // once every 5 minutes per member.
+  void touchLastSeen(me.id, me.last_seen_at);
 
   const supabase = createClient();
   const [cityMap, clubMap, season] = await Promise.all([

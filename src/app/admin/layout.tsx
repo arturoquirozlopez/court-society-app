@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
  * drop the 430px viewport clamp at lg+ so the layout can stretch.
  */
 const TABS = [
+  { href: "/admin/analytics",    label: "Analytics" },
   { href: "/admin/applications", label: "Applications" },
   { href: "/admin/members",      label: "Members" },
   { href: "/admin/groups",       label: "Groups" },

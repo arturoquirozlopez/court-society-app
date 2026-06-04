@@ -10,6 +10,7 @@ import { SignOutLink } from "@/components/SignOutLink";
  * but exposes the admin sections instead of member nav.
  */
 const NAV = [
+  { href: "/admin/analytics", icon: "▦", label: "Analytics" },
   { href: "/admin/applications", icon: "✦", label: "Applications" },
   { href: "/admin/members", icon: "◇", label: "Members" },
   { href: "/admin/groups", icon: "⌘", label: "Groups" },
@@ -31,7 +32,7 @@ export function DesktopAdminSidebar({
     <aside className="hidden lg:flex lg:flex-col lg:sticky lg:top-0 lg:h-dvh w-[264px] bg-cs-green text-cs-ivory border-r border-black/40">
       {/* Brand */}
       <div className="px-7 pt-7 pb-6 border-b border-white/10">
-        <Link href="/admin/applications" className="block">
+        <Link href="/admin/analytics" className="block">
           <div className="font-display italic text-[28px] leading-none -tracking-[0.01em]">
             Court<span className="text-cs-brassLight mx-[2px]">·</span>Society
           </div>

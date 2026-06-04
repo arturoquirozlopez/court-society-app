@@ -43,7 +43,7 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
   // Load the linked challenge and validate it
   const { data: ch } = await supabase
     .from("challenges")
-    .select("id, author_id, accepted_by, status")
+    .select("id, author_id, accepted_by, status, city_id")
     .eq("id", v.challenge_id)
     .maybeSingle();
   if (!ch)
@@ -53,6 +53,7 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
     author_id: string;
     accepted_by: string | null;
     status: string;
+    city_id: string | null;
   };
   if (row.status !== "accepted")
     return {
@@ -87,6 +88,18 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
   const season = await getActiveSeason();
   if (!season) return { ok: false, error: "No active season." } as const;
 
+  // Denormalised match city — prefer the challenge city, fall back to the
+  // author's home city. Powers density and travel KPIs without a join.
+  let cityId: string | null = row.city_id;
+  if (!cityId) {
+    const { data: meCity } = await supabase
+      .from("profiles")
+      .select("home_city_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    cityId = (meCity as { home_city_id: string | null } | null)?.home_city_id ?? null;
+  }
+
   const { error } = await supabase.from("matches").insert({
     season_id: season.id,
     author_id: user.id,
@@ -95,6 +108,7 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
     score: v.score || null,
     note: v.note || null,
     challenge_id: v.challenge_id,
+    city_id: cityId,
   });
   if (error) return { ok: false, error: error.message } as const;
 

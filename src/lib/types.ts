@@ -107,6 +107,7 @@ export interface Profile {
   nominated_by_text: string | null;
   joined_at: string | null;
   onboarding_completed: boolean;
+  last_seen_at: string | null;
   created_at: string;
   updated_at: string;
 }

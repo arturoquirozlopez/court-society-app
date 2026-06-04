@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// Admin landing → applications queue
+// Admin landing → analytics dashboard. Applications is one click away.
 export default function AdminHome() {
-  redirect("/admin/applications");
+  redirect("/admin/analytics");
 }
