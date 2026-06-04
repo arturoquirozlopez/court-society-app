@@ -112,7 +112,12 @@ export default async function DashboardPage() {
   const playedSet = new Set((matchedChIds ?? []).map((m) => m.challenge_id as string));
   const upcoming = accepted.filter((c) => !playedSet.has(c.id)).slice(0, 4);
 
-  const visitingPlans = visitingRows.data ?? [];
+  const visitingPlans = (visitingRows.data ?? []) as {
+    profile_id: string;
+    city_id: string;
+    start_date: string | null;
+    end_date: string | null;
+  }[];
   const openChallenges = (openChallengeRows.data ?? []) as {
     id: string;
     author_id: string;
@@ -125,19 +130,23 @@ export default async function DashboardPage() {
   }[];
 
   // People we need to display ---------------------------------------------
-  const peopleIds = Array.from(
-    new Set<string>([
-      ...recentMatches.map((m) => (m.author_id === me.id ? m.opponent_id : m.author_id)),
-      ...upcoming.map((c) => (c.author_id === me.id ? c.accepted_by : c.author_id)),
-      ...visitingPlans.map((v) => v.profile_id),
-      ...openChallenges.map((c) => c.author_id),
-      ...(seasonRank?.sorted.slice(0, 5).map((r) => r.profile_id) ?? []),
-      ...Array.from(rivals.entries())
-        .sort((a, b) => b[1].wins + b[1].losses - (a[1].wins + a[1].losses))
-        .slice(0, 4)
-        .map(([id]) => id),
-    ]),
-  ).filter((id) => id !== me.id);
+  const idSet = new Set<string>();
+  for (const m of recentMatches) {
+    idSet.add(m.author_id === me.id ? m.opponent_id : m.author_id);
+  }
+  for (const c of upcoming) {
+    idSet.add(c.author_id === me.id ? c.accepted_by : c.author_id);
+  }
+  for (const v of visitingPlans) idSet.add(v.profile_id);
+  for (const c of openChallenges) idSet.add(c.author_id);
+  for (const r of seasonRank?.sorted.slice(0, 5) ?? []) idSet.add(r.profile_id);
+  for (const [id] of Array.from(rivals.entries())
+    .sort((a, b) => b[1].wins + b[1].losses - (a[1].wins + a[1].losses))
+    .slice(0, 4)) {
+    idSet.add(id);
+  }
+  idSet.delete(me.id);
+  const peopleIds = Array.from(idSet);
   const peopleArr = await getProfilesByIds(peopleIds);
   const people = new Map(peopleArr.map((p) => [p.id, p] as const));
 
