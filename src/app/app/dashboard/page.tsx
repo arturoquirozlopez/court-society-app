@@ -224,7 +224,7 @@ export default async function DashboardPage() {
               </h1>
             </div>
             <div className="text-right text-[11px] tracking-[0.2em] uppercase text-cs-muted leading-relaxed">
-              Season {season?.year ?? ""} · Week {seasonWeek(season?.started_at)}
+              Season {season?.year ?? ""} · Week {seasonWeek(season?.year)}
               <br />
               <span className="font-display italic text-[14px] text-cs-green tracking-normal normal-case">
                 {homeCityName}
@@ -531,13 +531,13 @@ function firstName(name: string | null | undefined) {
   return name?.split(" ")[0] ?? "there";
 }
 
-function seasonWeek(startedAt: string | null | undefined) {
-  if (!startedAt) return "—";
+function seasonWeek(year: number | null | undefined) {
+  if (!year) return "—";
+  // Calendar week within the season's year — good enough for the dashboard.
+  const start = new Date(year, 0, 1).getTime();
   const w = Math.max(
     1,
-    Math.ceil(
-      (Date.now() - new Date(startedAt).getTime()) / (7 * 24 * 60 * 60 * 1000),
-    ),
+    Math.ceil((Date.now() - start) / (7 * 24 * 60 * 60 * 1000)),
   );
   return String(w);
 }
