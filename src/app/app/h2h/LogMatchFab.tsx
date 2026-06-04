@@ -85,6 +85,7 @@ export function LogMatchFab({ playable }: { playable: PlayableChallenge[] }) {
 
   return (
     <>
+      {/* Mobile FAB */}
       <button
         onClick={() => {
           reset();
@@ -95,6 +96,24 @@ export function LogMatchFab({ playable }: { playable: PlayableChallenge[] }) {
       >
         ＋
       </button>
+
+      {/* Desktop inline button — renders inline where the component is
+          mounted (e.g. inside the page head). Only when there's something
+          to log. */}
+      {!isEmpty && (
+        <button
+          onClick={() => {
+            reset();
+            setOpen(true);
+          }}
+          className="hidden lg:inline-flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase px-5 py-3 bg-cs-green text-cs-ivory hover:bg-cs-greenLight transition-colors relative"
+          aria-label="Log match"
+        >
+          <span className="text-[16px] leading-none">＋</span>
+          Log a match
+          <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-cs-brass" />
+        </button>
+      )}
       <Sheet
         open={open}
         onClose={() => setOpen(false)}

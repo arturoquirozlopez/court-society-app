@@ -113,6 +113,9 @@ export default async function H2hPage() {
                 Head to Head
               </h1>
             </div>
+            {/* Desktop log-match button. The FAB stays hidden at lg+; this
+                inline button (inside LogMatchFab) is the desktop entry. */}
+            <LogMatchFab playable={playable} />
           </div>
 
           {sorted.length === 0 ? (

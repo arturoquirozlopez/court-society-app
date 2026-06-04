@@ -1,10 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { winRate } from "@/lib/format";
-import { LEVEL_SHORT, type PlayLevel, type Profile } from "@/lib/types";
+import {
+  LEVEL_SHORT,
+  type GroupInvitation,
+  type GroupWithContext,
+  type PlayLevel,
+  type Profile,
+} from "@/lib/types";
+import { NewGroupSheet } from "./NewGroupSheet";
+import { GroupInvitations } from "./GroupInvitations";
+import { deleteGroup, leaveGroup } from "@/lib/actions/groups";
 
 type PlayerRow = Profile & {
   wins: number;
@@ -13,6 +22,14 @@ type PlayerRow = Profile & {
   total_matches: number;
   activity_multiplier: number;
   decay_factor: number;
+};
+
+type Pickable = {
+  id: string;
+  full_name: string | null;
+  photo_url: string | null;
+  home_club_id: string | null;
+  home_city_id: string | null;
 };
 
 /**
@@ -31,6 +48,8 @@ export function RankingDesktop({
   cities,
   clubs,
   seasonYear,
+  groups,
+  invitations,
 }: {
   meId: string;
   meLevel: PlayLevel | null;
@@ -38,15 +57,40 @@ export function RankingDesktop({
   cities: { id: string; name: string }[];
   clubs: { id: string; name: string; city_id: string }[];
   seasonYear: number | null;
+  groups: GroupWithContext[];
+  invitations: GroupInvitation[];
 }) {
   type Mode = "open" | "M" | "F";
   const [mode, setMode] = useState<Mode>("open");
+  const [cityId, setCityId] = useState<string>("all");
   const [clubId, setClubId] = useState<string>("all");
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [, startGroupAction] = useTransition();
+
+  const sortedCities = useMemo(
+    () => cities.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [cities],
+  );
+  const sortedClubs = useMemo(
+    () => clubs.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [clubs],
+  );
+
+  // Selected private group → restrict the leaderboard to its members.
+  const selectedGroup = useMemo(
+    () => (groupId ? groups.find((g) => g.id === groupId) ?? null : null),
+    [groupId, groups],
+  );
 
   const filtered = useMemo(() => {
     return players
       .filter((p) => {
+        if (selectedGroup) {
+          if (!new Set(selectedGroup.member_ids).has(p.id)) return false;
+        }
         if (mode !== "open" && p.gender !== mode) return false;
+        if (cityId !== "all" && p.home_city_id !== cityId) return false;
         if (clubId !== "all" && p.home_club_id !== clubId) return false;
         return true;
       })
@@ -55,7 +99,36 @@ export function RankingDesktop({
         if (a.total_points !== b.total_points) return b.total_points - a.total_points;
         return b.total_matches - a.total_matches;
       });
-  }, [players, mode, clubId]);
+  }, [players, mode, cityId, clubId, selectedGroup]);
+
+  // For NewGroupSheet — only need a slim set of fields.
+  const candidates: Pickable[] = useMemo(
+    () =>
+      players
+        .filter((p) => p.id !== meId)
+        .map((p) => ({
+          id: p.id,
+          full_name: p.full_name,
+          photo_url: p.photo_url,
+          home_club_id: p.home_club_id,
+          home_city_id: p.home_city_id,
+        })),
+    [players, meId],
+  );
+
+  function handleGroupAction() {
+    if (!selectedGroup) return;
+    const confirmText = selectedGroup.is_creator
+      ? `Delete group "${selectedGroup.name}"? This can't be undone.`
+      : `Leave "${selectedGroup.name}"?`;
+    if (!confirm(confirmText)) return;
+    startGroupAction(async () => {
+      const res = selectedGroup.is_creator
+        ? await deleteGroup(selectedGroup.id)
+        : await leaveGroup(selectedGroup.id);
+      if (res.ok) setGroupId(null);
+    });
+  }
 
   const me = players.find((p) => p.id === meId);
   const myRank = filtered.findIndex((p) => p.id === meId) + 1 || null;
@@ -92,39 +165,94 @@ export function RankingDesktop({
     <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:min-h-dvh">
       {/* Main column ----------------------------------------------------- */}
       <section className="px-10 pb-16">
-        {/* Head + filter chips */}
+        {/* Head + actions */}
         <div className="flex items-end justify-between pt-8 pb-6 border-b border-cs-green/10">
           <div>
             <div className="text-[10px] tracking-[0.28em] uppercase text-cs-brass">
-              {seasonYear ? `S E A S O N  ${seasonYear}` : "—"}
+              {selectedGroup
+                ? `P R I V A T E  ·  ${selectedGroup.name.toUpperCase()}`
+                : seasonYear ? `S E A S O N  ${seasonYear}` : "—"}
             </div>
             <h1 className="font-display italic text-[42px] leading-none mt-2 text-cs-green -tracking-[0.015em]">
               Ranking
             </h1>
           </div>
-          <div className="flex gap-2">
-            <Chip on={mode === "open"} onClick={() => setMode("open")}>
-              Open
-            </Chip>
-            <Chip on={mode === "M"} onClick={() => setMode("M")}>
-              Men
-            </Chip>
-            <Chip on={mode === "F"} onClick={() => setMode("F")}>
-              Women
-            </Chip>
-            <select
-              value={clubId}
-              onChange={(e) => setClubId(e.target.value)}
-              className="text-[11px] tracking-[0.18em] uppercase px-4 py-2.5 bg-transparent border border-cs-green/20 text-cs-green focus:outline-none focus:border-cs-green"
-            >
-              <option value="all">By club · All</option>
-              {clubs.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex gap-2 items-center">
+            {selectedGroup ? (
+              <>
+                <button
+                  onClick={() => setGroupId(null)}
+                  className="text-[11px] tracking-[0.18em] uppercase text-cs-muted hover:text-cs-green px-3 py-2.5"
+                >
+                  ← Season
+                </button>
+                <button
+                  onClick={handleGroupAction}
+                  className="text-[11px] tracking-[0.18em] uppercase px-4 py-2.5 border border-cs-loss/40 text-cs-loss hover:bg-cs-loss/5"
+                >
+                  {selectedGroup.is_creator ? "Delete group" : "Leave"}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setNewGroupOpen(true)}
+                className="text-[11px] tracking-[0.18em] uppercase px-4 py-2.5 bg-cs-green text-cs-ivory relative hover:bg-cs-greenLight transition-colors"
+              >
+                + New private ranking
+                <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-cs-brass" />
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Filter row */}
+        <div className="flex flex-wrap gap-2 mt-5">
+          <Chip on={mode === "open"} onClick={() => setMode("open")}>
+            Open
+          </Chip>
+          <Chip on={mode === "M"} onClick={() => setMode("M")}>
+            Men
+          </Chip>
+          <Chip on={mode === "F"} onClick={() => setMode("F")}>
+            Women
+          </Chip>
+          <span className="w-px bg-cs-green/10 mx-1" />
+          <select
+            value={cityId}
+            onChange={(e) => setCityId(e.target.value)}
+            className="text-[11px] tracking-[0.18em] uppercase px-4 py-2.5 bg-transparent border border-cs-green/20 text-cs-green focus:outline-none focus:border-cs-green"
+          >
+            <option value="all">By city · All</option>
+            {sortedCities.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={clubId}
+            onChange={(e) => setClubId(e.target.value)}
+            className="text-[11px] tracking-[0.18em] uppercase px-4 py-2.5 bg-transparent border border-cs-green/20 text-cs-green focus:outline-none focus:border-cs-green"
+          >
+            <option value="all">By club · All</option>
+            {sortedClubs.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {(mode !== "open" || cityId !== "all" || clubId !== "all") && (
+            <button
+              onClick={() => {
+                setMode("open");
+                setCityId("all");
+                setClubId("all");
+              }}
+              className="text-[10px] tracking-[0.2em] uppercase text-cs-brass hover:text-cs-green ml-2"
+            >
+              Clear →
+            </button>
+          )}
         </div>
 
         {/* Podium */}
@@ -319,7 +447,102 @@ export function RankingDesktop({
             </p>
           )}
         </div>
+
+        {/* Private rankings (groups) */}
+        <div>
+          <h2 className="font-display italic text-[18px] text-cs-green mb-3">
+            Private rankings
+          </h2>
+          {invitations.length > 0 && (
+            <div className="mb-4">
+              <GroupInvitations invitations={invitations} />
+            </div>
+          )}
+          {groups.length === 0 ? (
+            <p className="text-[12px] text-cs-muted mb-3">
+              Create a private ranking with friends or club members. Only
+              matches between members of the group count.
+            </p>
+          ) : (
+            <div className="mb-3">
+              {groups.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setGroupId(g.id)}
+                  className={`w-full text-left flex justify-between items-center py-2.5 border-b border-cs-green/10 last:border-b-0 ${
+                    groupId === g.id ? "text-cs-brass" : "text-cs-green hover:text-cs-brass"
+                  }`}
+                >
+                  <span className="text-[13px] truncate">{g.name}</span>
+                  <span className="text-[10px] tracking-[0.16em] uppercase text-cs-muted ml-2">
+                    {g.member_ids.length}{" "}
+                    {g.member_ids.length === 1 ? "member" : "members"}
+                    {g.is_creator && " · owner"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setNewGroupOpen(true)}
+            className="w-full text-[10px] tracking-[0.2em] uppercase text-cs-green border border-cs-green/30 py-2.5 hover:border-cs-green"
+          >
+            + Create private ranking
+          </button>
+        </div>
+
+        {/* How points work */}
+        <div>
+          <h2 className="font-display italic text-[18px] text-cs-green mb-2">
+            How points work
+          </h2>
+          <p className="text-[11.5px] text-cs-muted leading-relaxed mb-3">
+            Court Society Points reward consistent, balanced play.
+          </p>
+          <div className="bg-[#FBF8F0] border border-cs-green/10 px-4 py-3 font-display italic text-[14px] text-cs-green text-center">
+            base × activity × decay
+          </div>
+          <ul className="space-y-2.5 mt-4 text-[11.5px] text-cs-black/75 leading-relaxed">
+            <li className="flex gap-2">
+              <span className="text-cs-brass">·</span>
+              <span>
+                <b className="text-cs-green">Base</b>: 100 per win, more if your
+                opponent is ranked higher, fewer if lower.
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span className="text-cs-brass">·</span>
+              <span>
+                <b className="text-cs-green">Activity ×</b>: scales 0.5 → 1.5 by
+                matches played in the last 30 days.
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span className="text-cs-brass">·</span>
+              <span>
+                <b className="text-cs-green">Decay</b>: starts at 1.0, falls if
+                you haven&apos;t played in a while.
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span className="text-cs-brass">·</span>
+              <span>
+                Mixed-gender matches count for activity but not ranking points.
+              </span>
+            </li>
+          </ul>
+        </div>
       </aside>
+
+      {/* New private ranking sheet */}
+      <NewGroupSheet
+        open={newGroupOpen}
+        onClose={() => setNewGroupOpen(false)}
+        meId={meId}
+        candidates={candidates}
+        clubName={clubName}
+        onCreated={() => setNewGroupOpen(false)}
+      />
     </div>
   );
 }

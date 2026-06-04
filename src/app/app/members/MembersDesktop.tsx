@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { LEVEL_SHORT, type PlayLevel, type Profile } from "@/lib/types";
+import {
+  FORMAT_LABEL,
+  LEVEL_LABEL,
+  LEVEL_SHORT,
+  type PlayLevel,
+  type Profile,
+} from "@/lib/types";
+import { linkedinDisplay } from "@/lib/format";
 
 /**
  * Desktop variant of /app/members. Filter rail on the left, 3-col card grid
@@ -253,68 +260,81 @@ export function MembersDesktop({
                 No members match the current filters.
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-5">
                 {filtered.map((m) => {
                   const visiting = realVisiting(m);
+                  const li = linkedinDisplay(m.linkedin_url);
                   return (
                     <Link
                       key={m.id}
                       href={`/app/members/${m.id}`}
-                      className="relative bg-[#FBF8F0] border border-cs-green/10 p-5 flex flex-col gap-3 hover:border-cs-brass transition-colors group min-h-[176px]"
+                      className="relative bg-[#FBF8F0] border border-cs-green/10 p-6 flex flex-col gap-4 hover:border-cs-brass transition-colors group min-h-[220px]"
                     >
-                      {/* Top row — avatar + name, with right padding so the
-                          badge can never collide with the name */}
-                      <div className={`flex items-start gap-3 ${visiting ? "pr-20" : ""}`}>
+                      {/* Visiting badge — only when visiting a *different*
+                          city than home */}
+                      {visiting && (
+                        <span className="absolute top-5 right-5 text-[9px] tracking-[0.2em] uppercase text-cs-brass border border-cs-brass px-2 py-0.5 bg-[#FBF8F0]">
+                          Visiting {cityName(visiting)}
+                        </span>
+                      )}
+
+                      {/* Top row — large avatar + name + headline */}
+                      <div className={`flex items-start gap-4 ${visiting ? "pr-32" : ""}`}>
                         <Avatar
                           url={m.photo_url}
                           seed={m.id}
                           alt={m.full_name ?? ""}
-                          size={44}
+                          size={64}
                         />
                         <div className="min-w-0 flex-1">
                           <div
-                            className="font-display italic text-[16px] text-cs-green leading-tight truncate group-hover:text-cs-brass"
+                            className="font-display italic text-[20px] text-cs-green leading-tight truncate group-hover:text-cs-brass"
                             title={m.full_name ?? ""}
                           >
                             {m.full_name ?? "—"}
                           </div>
                           {m.headline && (
                             <div
-                              className="text-[11px] text-cs-muted truncate mt-1"
+                              className="text-[12px] text-cs-muted line-clamp-2 mt-1.5 leading-snug"
                               title={m.headline}
                             >
                               {m.headline}
                             </div>
                           )}
+                          <div className="text-[10px] tracking-[0.22em] uppercase text-cs-brass mt-2.5 truncate">
+                            {cityName(m.home_city_id ?? "") || "—"}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Visiting badge — only when visiting a *different*
-                          city than home */}
-                      {visiting && (
-                        <span className="absolute top-4 right-4 text-[9px] tracking-[0.2em] uppercase text-cs-brass border border-cs-brass px-1.5 py-0.5 bg-[#FBF8F0]">
-                          Visiting
-                        </span>
-                      )}
-
-                      {/* City / route line */}
-                      <div className="text-[10px] tracking-[0.22em] uppercase text-cs-brass truncate">
-                        {visiting
-                          ? `${cityName(m.home_city_id ?? "")} → ${cityName(visiting)}`
-                          : cityName(m.home_city_id ?? "") || "—"}
-                      </div>
-
-                      {/* Bottom row — level chip + club name (truncates) */}
-                      <div className="mt-auto pt-3 border-t border-dashed border-cs-green/15 grid grid-cols-[auto_minmax(0,1fr)] gap-3 items-center">
-                        <span className="px-2 py-0.5 border border-cs-green/30 text-[10px] tracking-[0.16em] uppercase text-cs-green whitespace-nowrap">
-                          {m.level ? LEVEL_SHORT[m.level] : "—"}
-                        </span>
-                        <span
-                          className="text-[11px] text-cs-muted truncate text-right"
-                          title={clubName(m.home_club_id)}
-                        >
-                          {clubName(m.home_club_id)}
-                        </span>
+                      {/* Details rows — full club + level label */}
+                      <div className="mt-auto pt-4 border-t border-dashed border-cs-green/15 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[11px]">
+                        <DetailRow label="Club" value={clubName(m.home_club_id)} />
+                        <DetailRow
+                          label="Level"
+                          value={m.level ? LEVEL_LABEL[m.level] : "—"}
+                        />
+                        <DetailRow
+                          label="Format"
+                          value={m.format ? FORMAT_LABEL[m.format] : "—"}
+                        />
+                        <DetailRow
+                          label="Member since"
+                          value={memberSince(m.joined_at ?? m.created_at)}
+                        />
+                        {li && (
+                          <div className="col-span-2">
+                            <div className="text-[9px] tracking-[0.2em] uppercase text-cs-muted mb-0.5">
+                              LinkedIn
+                            </div>
+                            <span
+                              className="text-[12px] text-cs-green underline decoration-cs-brass underline-offset-2 truncate block"
+                              title={li.label}
+                            >
+                              {li.label}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </Link>
                   );
@@ -425,6 +445,23 @@ export function MembersDesktop({
 function fmtMonth(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+function memberSince(iso: string) {
+  return fmtMonth(iso);
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9px] tracking-[0.2em] uppercase text-cs-muted mb-0.5">
+        {label}
+      </div>
+      <div className="text-[12px] text-cs-green truncate" title={value}>
+        {value}
+      </div>
+    </div>
+  );
 }
 
 function FilterGroup({

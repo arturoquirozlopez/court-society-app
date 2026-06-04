@@ -159,6 +159,8 @@ export default async function RankingPage() {
         cities={cities}
         clubs={clubs}
         seasonYear={season?.year ?? null}
+        groups={acceptedGroups}
+        invitations={invitations}
       />
 
       {/* Mobile — unchanged */}
