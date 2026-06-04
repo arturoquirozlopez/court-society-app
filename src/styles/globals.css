@@ -13,11 +13,16 @@ html, body {
   -webkit-font-smoothing: antialiased;
   font-family: "DM Sans", system-ui, sans-serif;
 }
-/* Mobile viewport mimic from prototype */
+/* Mobile viewport mimic from prototype.
+   On desktop (>=1024px), if the /app shell is mounted, lift the clamp so the
+   sidebar + content grid can stretch edge-to-edge. */
 .viewport {
   max-width: 430px;
   margin: 0 auto;
   min-height: 100dvh;
+}
+@media (min-width: 1024px) {
+  .viewport:has(.app-shell) { max-width: 100%; }
 }
 
 /* Re-usable utility classes ported from prototype that map cleanly to Tailwind escape hatches */

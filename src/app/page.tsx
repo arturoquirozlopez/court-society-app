@@ -12,6 +12,8 @@ import { getCurrentProfile } from "@/lib/auth";
 export default async function Home() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
+  // Post-login lands on Profile — same on mobile and desktop. Desktop users
+  // reach the dashboard via the sidebar (or via the brand mark).
   if (profile.status === "approved") redirect("/app/profile");
   if (profile.status === "waitlisted") redirect("/waitlisted");
   if (profile.status === "rejected") redirect("/rejected");
