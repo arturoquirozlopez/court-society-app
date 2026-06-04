@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCityMap, getClubMap } from "@/lib/queries";
 import { Hero } from "@/components/Hero";
 import { MembersClient } from "./MembersClient";
+import { MembersDesktop } from "./MembersDesktop";
 import type { Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -47,21 +48,37 @@ export default async function MembersPage() {
     city_id: c.city_id,
   }));
 
+  const visitingByProfileObj = Object.fromEntries(visitingByProfile);
+
   return (
-    <div>
-      <Hero
-        title={<>Members</>}
-        subtitle={`${members.length} members across ${cities.length} cities`}
-      />
-      <MembersClient
+    <>
+      {/* Desktop */}
+      <MembersDesktop
         meId={me.id}
+        meLevel={me.level}
         meHomeCityId={me.home_city_id}
-        meHomeClubId={me.home_club_id}
         members={members}
         cities={cities}
         clubs={clubs}
-        visitingByProfile={Object.fromEntries(visitingByProfile)}
+        visitingByProfile={visitingByProfileObj}
       />
-    </div>
+
+      {/* Mobile — unchanged */}
+      <div className="lg:hidden">
+        <Hero
+          title={<>Members</>}
+          subtitle={`${members.length} members across ${cities.length} cities`}
+        />
+        <MembersClient
+          meId={me.id}
+          meHomeCityId={me.home_city_id}
+          meHomeClubId={me.home_club_id}
+          members={members}
+          cities={cities}
+          clubs={clubs}
+          visitingByProfile={visitingByProfileObj}
+        />
+      </div>
+    </>
   );
 }

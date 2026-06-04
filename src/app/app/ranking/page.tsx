@@ -9,6 +9,7 @@ import {
 } from "@/lib/queries";
 import { Hero } from "@/components/Hero";
 import { RankingClient } from "./RankingClient";
+import { RankingDesktop } from "./RankingDesktop";
 import type {
   GroupInvitation,
   GroupWithContext,
@@ -149,24 +150,37 @@ export default async function RankingPage() {
     .map(([id, c]) => ({ id, name: c.name, city_id: c.city_id }));
 
   return (
-    <div>
-      <Hero
-        title={<>Ranking</>}
-        subtitle={`${season ? `Season ${season.year}` : "—"} · ${players.length} members · by Court Society Points`}
-      />
-      <RankingClient
+    <>
+      {/* Desktop */}
+      <RankingDesktop
         meId={me.id}
-        meCityId={me.home_city_id}
-        meClubId={me.home_club_id}
         meLevel={me.level}
-        meGender={me.gender}
         players={players}
         cities={cities}
         clubs={clubs}
-        visitingByProfile={visitingByProfile}
-        groups={acceptedGroups}
-        invitations={invitations}
+        seasonYear={season?.year ?? null}
       />
-    </div>
+
+      {/* Mobile — unchanged */}
+      <div className="lg:hidden">
+        <Hero
+          title={<>Ranking</>}
+          subtitle={`${season ? `Season ${season.year}` : "—"} · ${players.length} members · by Court Society Points`}
+        />
+        <RankingClient
+          meId={me.id}
+          meCityId={me.home_city_id}
+          meClubId={me.home_club_id}
+          meLevel={me.level}
+          meGender={me.gender}
+          players={players}
+          cities={cities}
+          clubs={clubs}
+          visitingByProfile={visitingByProfile}
+          groups={acceptedGroups}
+          invitations={invitations}
+        />
+      </div>
+    </>
   );
 }

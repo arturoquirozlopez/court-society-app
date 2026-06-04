@@ -48,15 +48,17 @@ export function OnboardingOverlay({
 
   return (
     <>
-      {/* Top-right help icon, sized to the 430px viewport */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-viewport z-30 pointer-events-none">
+      {/* Top-right help icon. On mobile it lives inside the centered 430px
+          viewport column; on desktop (≥1024px) it pins to the real top-right
+          of the screen. */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-viewport lg:max-w-none lg:left-0 lg:translate-x-0 z-30 pointer-events-none">
         <button
           onClick={() => {
             setStep(0);
             setOpen(true);
           }}
           aria-label="How Court Society works"
-          className="absolute top-3 right-3 pointer-events-auto w-9 h-9 rounded-full border border-cs-brass/50 bg-cs-ivory/90 backdrop-blur flex items-center justify-center text-cs-green hover:border-cs-green transition-colors shadow-sm"
+          className="absolute top-3 right-3 lg:top-5 lg:right-7 pointer-events-auto w-9 h-9 rounded-full border border-cs-brass/50 bg-cs-ivory/90 backdrop-blur flex items-center justify-center text-cs-green hover:border-cs-green transition-colors shadow-sm"
         >
           <span className="font-display italic text-[15px] leading-none translate-y-[1px]">
             i

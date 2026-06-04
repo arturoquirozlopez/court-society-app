@@ -8,6 +8,7 @@ import {
 } from "@/lib/queries";
 import { Hero } from "@/components/Hero";
 import { ChallengesClient } from "./ChallengesClient";
+import { ChallengesRail } from "./ChallengesRail";
 
 export const dynamic = "force-dynamic";
 
@@ -135,23 +136,52 @@ export default async function ChallengesPage() {
     .order("full_name");
 
   return (
-    <div>
-      <Hero
-        title={<>Challenges</>}
-        subtitle={`${activeCityName} · ${challenges.length} active`}
-      />
-      <ChallengesClient
-        meId={me.id}
-        meLevel={me.level}
-        meHomeClubId={me.home_club_id}
-        defaultCityId={activeCityId}
-        cities={cities}
-        clubs={clubs}
-        challenges={challenges}
-        clubsByChallenge={clubsByChallenge}
-        peopleById={peopleById}
-        targetCandidates={(candidates ?? []) as never}
-      />
-    </div>
+    <>
+      {/* Desktop page head ─ replaces the mobile Hero on lg+ */}
+      <div className="hidden lg:flex items-end justify-between px-10 pt-8 pb-6 border-b border-cs-green/10">
+        <div>
+          <div className="text-[10px] tracking-[0.28em] uppercase text-cs-brass">
+            {activeCityName.toUpperCase()} · {challenges.length} ACTIVE
+          </div>
+          <h1 className="font-display italic text-[42px] leading-none mt-2 text-cs-green -tracking-[0.015em]">
+            Challenges
+          </h1>
+        </div>
+      </div>
+
+      {/* Mobile Hero */}
+      <div className="lg:hidden">
+        <Hero
+          title={<>Challenges</>}
+          subtitle={`${activeCityName} · ${challenges.length} active`}
+        />
+      </div>
+
+      {/* Body: on lg+, 2-col with feed + rail. On mobile, feed alone. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:min-h-[calc(100dvh-180px)]">
+        <div id="feed">
+          <ChallengesClient
+            meId={me.id}
+            meLevel={me.level}
+            meHomeClubId={me.home_club_id}
+            defaultCityId={activeCityId}
+            cities={cities}
+            clubs={clubs}
+            challenges={challenges}
+            clubsByChallenge={clubsByChallenge}
+            peopleById={peopleById}
+            targetCandidates={(candidates ?? []) as never}
+          />
+        </div>
+        <div className="hidden lg:block">
+          <ChallengesRail
+            meId={me.id}
+            challenges={challenges}
+            peopleById={peopleById}
+            activeCityName={activeCityName}
+          />
+        </div>
+      </div>
+    </>
   );
 }

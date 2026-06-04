@@ -5,7 +5,9 @@ import {
   getActiveVisiting,
   getCityMap,
   getClubMap,
+  getMyRivals,
   getProfilesByIds,
+  getSeasonRanking,
   getSeasonStandings,
 } from "@/lib/queries";
 import {
@@ -20,7 +22,8 @@ import { ProfileEditor } from "./ProfileEditor";
 import { PendingInbox } from "./PendingInbox";
 import { NominateButton } from "./NominateButton";
 import { MyNominations } from "./MyNominations";
-import type { Match, Nomination } from "@/lib/types";
+import { ProfileDesktop } from "./ProfileDesktop";
+import type { Match, Nomination, Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +40,48 @@ export default async function ProfilePage() {
 
   const standings = season ? await getSeasonStandings(season.id) : new Map();
   const myStats = standings.get(me.id) ?? { wins: 0, losses: 0 };
+
+  // Desktop-only enrichment: ranking position + points + recent matches +
+  // top rivals. Same primitives as elsewhere — no new RPCs.
+  const seasonRank = season ? await getSeasonRanking(season.id) : null;
+  const myRank = seasonRank
+    ? seasonRank.sorted.findIndex((r) => r.profile_id === me.id) + 1 || null
+    : null;
+  const totalRanked = seasonRank?.sorted.length ?? 0;
+  const myPoints = seasonRank?.ranking.get(me.id)?.total_points ?? 0;
+
+  const { data: recentMatchRows } = await supabase
+    .from("matches")
+    .select("*")
+    .or(`author_id.eq.${me.id},opponent_id.eq.${me.id}`)
+    .eq("status", "confirmed")
+    .order("created_at", { ascending: false })
+    .limit(8);
+  const recentMatches = (recentMatchRows ?? []) as unknown as Match[];
+
+  const rivals = await getMyRivals(me.id);
+  const topRivalIds = Array.from(rivals.entries())
+    .sort((a, b) => b[1].wins + b[1].losses - (a[1].wins + a[1].losses))
+    .slice(0, 5)
+    .map(([id]) => id);
+
+  const opponentIds = Array.from(
+    new Set<string>([
+      ...recentMatches.map((m) =>
+        m.author_id === me.id ? m.opponent_id : m.author_id,
+      ),
+      ...topRivalIds,
+    ]),
+  ).filter((id) => id !== me.id);
+  const opponents = await getProfilesByIds(opponentIds);
+  const opponentMap = new Map<string, Profile>(
+    opponents.map((p) => [p.id, p] as const),
+  );
+
+  const rivalsTop = topRivalIds.map((id) => {
+    const rec = rivals.get(id) ?? { wins: 0, losses: 0 };
+    return { id, wins: rec.wins, losses: rec.losses, profile: opponentMap.get(id) };
+  });
 
   // Pending confirmations addressed to me
   const { data: pending } = await supabase
@@ -150,7 +195,29 @@ export default async function ProfilePage() {
     .map(([id, c]) => ({ id, name: c.name }));
 
   return (
-    <div>
+    <>
+      {/* ════════════════ DESKTOP (≥1024px) ════════════════ */}
+      <ProfileDesktop
+        me={me}
+        cities={cities}
+        clubName={clubName}
+        cityName={cityName}
+        visitingName={visitingName ?? null}
+        activeVisitingCityId={visiting?.city_id ?? null}
+        cityMap={cityMap}
+        clubMap={clubMap}
+        myStats={myStats}
+        myPoints={myPoints}
+        myRank={myRank}
+        totalRanked={totalRanked}
+        recentMatches={recentMatches}
+        opponentMap={opponentMap}
+        rivalsTop={rivalsTop}
+        nominations={myNominations}
+      />
+
+      {/* ════════════════ MOBILE (<1024px) — unchanged ════════════════ */}
+      <div className="lg:hidden">
       {/* Hero */}
       <div className="relative overflow-hidden bg-cs-green text-cs-ivory px-7 pt-[52px] pb-8">
         <div
@@ -278,7 +345,8 @@ export default async function ProfilePage() {
           <SignOutLink />
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

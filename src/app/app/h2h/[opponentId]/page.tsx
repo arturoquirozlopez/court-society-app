@@ -7,8 +7,11 @@ import {
   getCityMap,
   getClubMap,
   getHeadToHead,
+  getMyRivals,
+  getProfilesByIds,
   getSeasonRanking,
 } from "@/lib/queries";
+import { H2HDesktop } from "./H2HDesktop";
 import { fmtDate, winRate } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import {
@@ -255,10 +258,48 @@ export default async function H2hDetail({
     insights.push("You haven't played each other yet. Post or accept a challenge to start the rivalry.");
   }
 
+  // Other rivalries for the desktop right rail
+  const allRivals = await getMyRivals(me.id);
+  const otherIds = Array.from(allRivals.keys())
+    .filter((id) => id !== opponent.id)
+    .sort((a, b) => {
+      const ra = allRivals.get(a)!;
+      const rb = allRivals.get(b)!;
+      return rb.wins + rb.losses - (ra.wins + ra.losses);
+    })
+    .slice(0, 5);
+  const otherProfiles = await getProfilesByIds(otherIds);
+  const otherProfileMap = new Map(otherProfiles.map((p) => [p.id, p] as const));
+  const otherRivals = otherIds.map((id) => {
+    const r = allRivals.get(id)!;
+    return { id, wins: r.wins, losses: r.losses, profile: otherProfileMap.get(id) };
+  });
+
   /* ────────── render ────────── */
 
   return (
-    <div className="min-h-dvh">
+    <>
+      {/* Desktop variant */}
+      <H2HDesktop
+        me={me}
+        opponent={opponent}
+        meLine={meLine}
+        oppLine={oppLine}
+        meH2HWins={meH2HWins}
+        oppH2HWins={oppH2HWins}
+        meSetsWon={meSetsWon}
+        oppSetsWon={oppSetsWon}
+        threeSetMatches={threeSetMatches}
+        meRank={rankOf(me.id)}
+        oppRank={rankOf(opponent.id)}
+        h2hConfirmed={h2hConfirmed}
+        h2hAll={h2hMatches}
+        insights={insights}
+        otherRivals={otherRivals}
+      />
+
+      {/* Mobile — unchanged */}
+      <div className="lg:hidden min-h-dvh">
       {/* ── HERO ── */}
       <section className="relative overflow-hidden bg-cs-green text-cs-ivory px-7 pt-12 pb-10">
         <Link
@@ -538,7 +579,8 @@ export default async function H2hDetail({
       )}
 
       <div className="h-12" />
-    </div>
+      </div>
+    </>
   );
 }
 
