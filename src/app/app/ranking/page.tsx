@@ -5,7 +5,7 @@ import {
   getCityMap,
   getClubMap,
   getProfilesByIds,
-  getSeasonStandings,
+  getSeasonRanking,
 } from "@/lib/queries";
 import { Hero } from "@/components/Hero";
 import { RankingClient } from "./RankingClient";
@@ -32,10 +32,25 @@ export default async function RankingPage() {
     getActiveSeason(),
   ]);
 
-  const standings = season ? await getSeasonStandings(season.id) : new Map();
+  const { ranking } = season
+    ? await getSeasonRanking(season.id)
+    : { ranking: new Map() };
   const players = ((members ?? []) as unknown as Profile[]).map((p) => {
-    const s = standings.get(p.id) ?? { wins: 0, losses: 0 };
-    return { ...p, wins: s.wins, losses: s.losses };
+    const r = ranking.get(p.id);
+    return {
+      ...p,
+      wins: r?.wins ?? 0,
+      losses: r?.losses ?? 0,
+      total_points: r?.total_points ?? 0,
+      total_matches: r?.total_matches ?? 0,
+      base_points: r?.base_points ?? 0,
+      matches_last_30: r?.matches_last_30 ?? 0,
+      activity_multiplier: r?.activity_multiplier ?? 1,
+      days_since_last: r?.days_since_last ?? null,
+      decay_factor: r?.decay_factor ?? 1,
+      avg_opponent_level: r?.avg_opponent_level ?? null,
+      recent_results: r?.recent_results ?? [],
+    };
   });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -137,7 +152,7 @@ export default async function RankingPage() {
     <div>
       <Hero
         title={<>Ranking</>}
-        subtitle={`${season ? `Season ${season.year}` : "—"} · ${players.length} members · by win rate`}
+        subtitle={`${season ? `Season ${season.year}` : "—"} · ${players.length} members · by Court Society Points`}
       />
       <RankingClient
         meId={me.id}

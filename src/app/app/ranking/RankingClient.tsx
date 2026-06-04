@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
-import { winRate } from "@/lib/format";
+import {
+  LEVEL_NAME,
+  formatMultiplier,
+  formatPoints,
+} from "@/lib/points";
 import {
   LEVEL_SHORT,
   type GroupInvitation,
@@ -13,9 +17,22 @@ import {
 } from "@/lib/types";
 import { NewGroupSheet } from "./NewGroupSheet";
 import { GroupInvitations } from "./GroupInvitations";
+import { PointsExplainer } from "./PointsExplainer";
 import { deleteGroup, leaveGroup } from "@/lib/actions/groups";
 
-type PlayerRow = Profile & { wins: number; losses: number };
+type PlayerRow = Profile & {
+  wins: number;
+  losses: number;
+  total_points: number;
+  total_matches: number;
+  base_points: number;
+  matches_last_30: number;
+  activity_multiplier: number;
+  days_since_last: number | null;
+  decay_factor: number;
+  avg_opponent_level: number | null;
+  recent_results: boolean[];
+};
 
 export function RankingClient({
   meId,
@@ -47,6 +64,7 @@ export function RankingClient({
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [busy, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const cityClubs = useMemo(
     () =>
@@ -63,7 +81,6 @@ export function RankingClient({
 
   const filtered = useMemo(() => {
     let list = players;
-
     if (selectedGroup) {
       const idSet = new Set(selectedGroup.member_ids);
       list = list.filter((p) => idSet.has(p.id));
@@ -81,12 +98,10 @@ export function RankingClient({
         return true;
       });
     }
-
     return list.sort((a, b) => {
-      const wa = winRate(a.wins, a.losses);
-      const wb = winRate(b.wins, b.losses);
-      if (wa !== wb) return wb - wa;
-      return b.wins + b.losses - (a.wins + a.losses);
+      if (a.total_points !== b.total_points)
+        return b.total_points - a.total_points;
+      return b.total_matches - a.total_matches;
     });
   }, [
     players,
@@ -96,9 +111,6 @@ export function RankingClient({
     clubFilter,
     visitingByProfile,
   ]);
-
-  const clubName = (id: string | null) =>
-    clubs.find((c) => c.id === id)?.name ?? "";
 
   function leaveOrDelete() {
     if (!selectedGroup) return;
@@ -118,13 +130,11 @@ export function RankingClient({
 
   return (
     <>
-      {/* Group invitations are surfaced in the Profile inbox (see PendingInbox).
-          Suppressed here to avoid duplication. */}
       {invitations.length > 0 && (
         <GroupInvitations invitations={invitations} />
       )}
 
-      {/* Groups row — always rendered, even when empty */}
+      {/* Groups row */}
       <div className="flex gap-1.5 px-7 py-3 overflow-x-auto border-b border-black/10 scrollbar-none items-center">
         <button
           onClick={() => setNewGroupOpen(true)}
@@ -149,7 +159,6 @@ export function RankingClient({
         ))}
       </div>
 
-      {/* Group header bar when a group is selected */}
       {selectedGroup && (
         <div className="px-7 py-3 border-b border-black/10 flex items-center justify-between gap-3 bg-cs-brass/[0.06]">
           <div className="min-w-0">
@@ -173,11 +182,8 @@ export function RankingClient({
         </div>
       )}
 
-      {msg && (
-        <p className="px-7 py-2 text-[12px] text-cs-loss">{msg}</p>
-      )}
+      {msg && <p className="px-7 py-2 text-[12px] text-cs-loss">{msg}</p>}
 
-      {/* Regular filters — hidden while a group is selected */}
       {!selectedGroup && (
         <>
           <Row>
@@ -249,53 +255,76 @@ export function RankingClient({
       )}
 
       <ul>
-        {filtered.map((p, i) => (
-          <li key={p.id}>
-            <Link
-              href={`/app/members/${p.id}`}
-              className={`flex items-center gap-3.5 px-7 py-4 border-b border-black/10 hover:bg-cs-green/[0.02] ${
-                p.id === meId
-                  ? "bg-cs-brass/[0.06] border-l-[3px] border-l-cs-brass"
-                  : ""
-              }`}
-            >
-              <span
-                className={`font-display text-[22px] min-w-[32px] text-right ${
-                  i < 3 ? "text-cs-brass" : "text-cs-green"
+        {filtered.map((p, i) => {
+          const isExpanded = expandedId === p.id;
+          return (
+            <li key={p.id}>
+              <button
+                onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                className={`flex items-center gap-3 px-7 py-4 border-b border-black/10 w-full text-left hover:bg-cs-green/[0.02] ${
+                  p.id === meId
+                    ? "bg-cs-brass/[0.06] border-l-[3px] border-l-cs-brass"
+                    : ""
                 }`}
+                aria-expanded={isExpanded}
               >
-                {i + 1}
-              </span>
-              <Avatar url={p.photo_url} seed={p.id} alt={p.full_name ?? ""} size={44} />
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium truncate">
-                  {p.id === meId ? "You" : p.full_name}
+                <span
+                  className={`font-display text-[22px] min-w-[28px] text-right ${
+                    i < 3 ? "text-cs-brass" : "text-cs-green"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <Avatar
+                  url={p.photo_url}
+                  seed={p.id}
+                  alt={p.full_name ?? ""}
+                  size={42}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[13px] font-medium truncate">
+                      {p.id === meId ? "You" : p.full_name}
+                    </span>
+                    {p.level === "former_pro" && (
+                      <span
+                        className="text-[8px] tracking-[0.16em] uppercase text-cs-brass border border-cs-brass/40 px-1 py-0 whitespace-nowrap"
+                        title="Former pro — ranking is contextual"
+                      >
+                        Pro
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-cs-muted mt-0.5 truncate">
+                    {clubs.find((c) => c.id === p.home_club_id)?.name ?? "—"}
+                  </div>
                 </div>
-                <div className="text-[10px] text-cs-muted mt-0.5 truncate">
-                  {clubs.find((c) => c.id === p.home_club_id)?.name ?? "—"}
+                <div className="text-right flex-shrink-0">
+                  <div className="font-display text-[18px] text-cs-green leading-none">
+                    {formatPoints(p.total_points)}
+                  </div>
+                  <div className="text-[10px] text-cs-muted mt-1">
+                    {p.total_matches} {p.total_matches === 1 ? "match" : "matches"}
+                  </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="font-display text-[20px] text-cs-green">
-                  {winRate(p.wins, p.losses)}%
-                </div>
-                <div className="text-[10px] text-cs-muted mt-0.5">
-                  {p.wins}W {p.losses}L
-                </div>
-              </div>
-            </Link>
-          </li>
-        ))}
+                <span className="text-cs-brass text-[9px] ml-1">
+                  {isExpanded ? "▲" : "▼"}
+                </span>
+              </button>
+              {isExpanded && <ExpandedRow player={p} />}
+            </li>
+          );
+        })}
         {filtered.length === 0 && (
           <li className="px-7 py-12 text-center">
             <div className="font-display italic text-[18px] text-cs-green">
-              {selectedGroup
-                ? "No matches played in this group yet."
-                : "No players match."}
+              {selectedGroup ? "No matches in this group yet." : "No players match."}
             </div>
           </li>
         )}
       </ul>
+
+      <PointsExplainer />
 
       <NewGroupSheet
         open={newGroupOpen}
@@ -307,9 +336,112 @@ export function RankingClient({
           photo_url: p.photo_url,
           home_club_id: p.home_club_id,
         }))}
-        clubName={clubName}
+        clubName={(id) => clubs.find((c) => c.id === id)?.name ?? ""}
       />
     </>
+  );
+}
+
+function ExpandedRow({ player: p }: { player: PlayerRow }) {
+  const wlText =
+    p.total_matches > 0 ? `${p.wins}W – ${p.losses}L` : "No matches yet";
+  const avgLvl = p.avg_opponent_level;
+  const avgLvlText =
+    avgLvl !== null
+      ? `${LEVEL_NAME[Math.round(avgLvl)] ?? "—"} (${avgLvl.toFixed(1)})`
+      : "—";
+  const daysText =
+    p.days_since_last === null
+      ? "No matches yet"
+      : p.days_since_last === 0
+        ? "Today"
+        : p.days_since_last === 1
+          ? "Yesterday"
+          : `${p.days_since_last} days ago`;
+
+  return (
+    <div className="bg-cs-ivory border-b border-black/10 px-7 py-5">
+      {/* Recent form */}
+      {p.recent_results.length > 0 && (
+        <Section label="Recent form">
+          <div className="flex gap-1">
+            {p.recent_results
+              .slice()
+              .reverse()
+              .map((won, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center justify-center w-6 h-6 text-[10px] font-semibold ${
+                    won ? "bg-cs-green text-cs-ivory" : "bg-cs-loss text-white"
+                  }`}
+                >
+                  {won ? "W" : "L"}
+                </span>
+              ))}
+          </div>
+        </Section>
+      )}
+
+      <Section label="W / L">
+        <span className="text-[13px] text-cs-black">{wlText}</span>
+      </Section>
+
+      <Section label="Avg rival level">
+        <span className="text-[13px] text-cs-black">{avgLvlText}</span>
+      </Section>
+
+      <Section label="Activity">
+        <span className="text-[13px] text-cs-black">
+          {p.matches_last_30} / 30d ·{" "}
+          <span className="font-display text-cs-green">
+            {formatMultiplier(p.activity_multiplier)}
+          </span>
+        </span>
+      </Section>
+
+      <Section label="Last match">
+        <span className="text-[13px] text-cs-black">
+          {daysText} ·{" "}
+          <span className="font-display text-cs-green">
+            {Math.round(p.decay_factor * 100)}% retained
+          </span>
+        </span>
+      </Section>
+
+      <Section label="Calculation">
+        <span className="text-[12px] text-cs-muted font-display">
+          {p.base_points} base × {formatMultiplier(p.activity_multiplier)} ×{" "}
+          {Math.round(p.decay_factor * 100)}% ={" "}
+          <span className="text-cs-green">{formatPoints(p.total_points)}</span>
+        </span>
+      </Section>
+
+      <div className="mt-3 text-right">
+        <Link
+          href={`/app/members/${p.id}`}
+          className="text-[10px] tracking-[0.12em] uppercase text-cs-brass hover:text-cs-green"
+        >
+          View profile →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex justify-between items-center py-2 border-b border-black/5 last:border-b-0">
+      <span className="text-[9px] tracking-[0.18em] uppercase text-cs-muted">
+        {label}
+      </span>
+      <span className="text-right">{children}</span>
+    </div>
   );
 }
 

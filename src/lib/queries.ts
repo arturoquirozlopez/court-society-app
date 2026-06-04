@@ -1,6 +1,12 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { Match, Profile } from "@/lib/types";
+import type { Match, PlayLevel, Profile } from "@/lib/types";
+import {
+  activityMultiplier,
+  basePoints,
+  decayFactor,
+  levelToIdx,
+} from "@/lib/points";
 
 /** Look up the currently active season, creating none — assumes seed.sql ran. */
 export async function getActiveSeason() {
@@ -122,4 +128,149 @@ export async function getActiveVisiting(profileId: string) {
     .order("created_at", { ascending: false })
     .limit(1);
   return (data?.[0] as { city_id: string; start_date: string | null; end_date: string | null } | undefined) ?? null;
+}
+
+/** Full Court Society Points breakdown for one player. */
+export interface PlayerRanking {
+  profile_id: string;
+  wins: number;
+  losses: number;
+  total_matches: number;
+  base_points: number;
+  matches_last_30: number;
+  activity_multiplier: number;
+  days_since_last: number | null;
+  decay_factor: number;
+  total_points: number;
+  /** Average level index (0–5, fractional) of confirmed opponents this season. */
+  avg_opponent_level: number | null;
+  /** Newest-first booleans for the last up-to-5 confirmed matches. */
+  recent_results: boolean[];
+}
+
+/**
+ * Court Society Points ranking for a given season. Pulls all confirmed
+ * matches + every approved member's level, runs the points formula in JS,
+ * and returns both an id-keyed Map (for lookups) and a sorted array
+ * (for the ranking list / rank-position queries).
+ */
+export async function getSeasonRanking(seasonId: string): Promise<{
+  ranking: Map<string, PlayerRanking>;
+  sorted: PlayerRanking[];
+}> {
+  const supabase = createClient();
+  const [{ data: matches }, { data: profiles }] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("id, author_id, opponent_id, author_result, created_at")
+      .eq("season_id", seasonId)
+      .eq("status", "confirmed"),
+    supabase
+      .from("profiles")
+      .select("id, level")
+      .eq("status", "approved"),
+  ]);
+
+  const levelById = new Map<string, number>();
+  for (const p of (profiles ?? []) as { id: string; level: PlayLevel | null }[]) {
+    const idx = levelToIdx(p.level);
+    if (idx !== null) levelById.set(p.id, idx);
+  }
+
+  type Bucket = {
+    base: number;
+    rows: { won: boolean; created_at: string; oppLevel: number | null }[];
+  };
+  const bucket = new Map<string, Bucket>();
+  const ensure = (id: string): Bucket => {
+    let b = bucket.get(id);
+    if (!b) {
+      b = { base: 0, rows: [] };
+      bucket.set(id, b);
+    }
+    return b;
+  };
+
+  for (const m of (matches ?? []) as {
+    author_id: string;
+    opponent_id: string;
+    author_result: "W" | "L";
+    created_at: string;
+  }[]) {
+    const aLvl = levelById.get(m.author_id);
+    const oLvl = levelById.get(m.opponent_id);
+    if (aLvl === undefined || oLvl === undefined) continue;
+
+    // Author POV
+    const authorWon = m.author_result === "W";
+    const a = ensure(m.author_id);
+    a.base += basePoints(authorWon, oLvl - aLvl);
+    a.rows.push({ won: authorWon, created_at: m.created_at, oppLevel: oLvl });
+
+    // Opponent POV
+    const o = ensure(m.opponent_id);
+    o.base += basePoints(!authorWon, aLvl - oLvl);
+    o.rows.push({ won: !authorWon, created_at: m.created_at, oppLevel: aLvl });
+  }
+
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const thirty = now - 30 * day;
+
+  const ranking = new Map<string, PlayerRanking>();
+  for (const [id, b] of bucket.entries()) {
+    const total = b.rows.length;
+    const wins = b.rows.filter((r) => r.won).length;
+    const matchesLast30 = b.rows.filter(
+      (r) => new Date(r.created_at).getTime() >= thirty,
+    ).length;
+    const mult = activityMultiplier(matchesLast30);
+    const lastTime = b.rows.reduce(
+      (max, r) => Math.max(max, new Date(r.created_at).getTime()),
+      0,
+    );
+    const days = lastTime > 0 ? Math.floor((now - lastTime) / day) : null;
+    const decay = days !== null ? decayFactor(days) : 1;
+    const total_points = Math.round(b.base * mult * decay);
+
+    const oppLvls = b.rows
+      .map((r) => r.oppLevel)
+      .filter((l): l is number => l !== null);
+    const avg_opponent_level =
+      oppLvls.length > 0
+        ? oppLvls.reduce((s, l) => s + l, 0) / oppLvls.length
+        : null;
+
+    const recent_results = b.rows
+      .slice()
+      .sort(
+        (a, c) =>
+          new Date(c.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      .slice(0, 5)
+      .map((r) => r.won);
+
+    ranking.set(id, {
+      profile_id: id,
+      wins,
+      losses: total - wins,
+      total_matches: total,
+      base_points: Math.round(b.base),
+      matches_last_30: matchesLast30,
+      activity_multiplier: mult,
+      days_since_last: days,
+      decay_factor: decay,
+      total_points,
+      avg_opponent_level,
+      recent_results,
+    });
+  }
+
+  const sorted = Array.from(ranking.values()).sort((a, b) => {
+    if (a.total_points !== b.total_points)
+      return b.total_points - a.total_points;
+    return b.total_matches - a.total_matches;
+  });
+
+  return { ranking, sorted };
 }

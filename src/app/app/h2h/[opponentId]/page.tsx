@@ -7,7 +7,7 @@ import {
   getCityMap,
   getClubMap,
   getHeadToHead,
-  getSeasonStandings,
+  getSeasonRanking,
 } from "@/lib/queries";
 import { fmtDate, winRate } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
@@ -133,21 +133,11 @@ export default async function H2hDetail({
   const meCareer = playerCareer(me.id);
   const oppCareer = playerCareer(opponent.id);
 
-  // Standings for rank
-  const standings = season ? await getSeasonStandings(season.id) : new Map();
-  const allStandings = Array.from(
-    standings.entries() as IterableIterator<[string, { wins: number; losses: number }]>,
-  )
-    .map(([id, s]) => ({ id, ...s, total: s.wins + s.losses }))
-    .filter((s) => s.total > 0)
-    .sort((a, b) => {
-      const ra = a.total > 0 ? a.wins / a.total : 0;
-      const rb = b.total > 0 ? b.wins / b.total : 0;
-      if (ra !== rb) return rb - ra;
-      return b.total - a.total;
-    });
+  // Standings for rank (Court Society Points)
+  const seasonRanking = season ? await getSeasonRanking(season.id) : null;
   const rankOf = (pid: string) => {
-    const i = allStandings.findIndex((s) => s.id === pid);
+    if (!seasonRanking) return null;
+    const i = seasonRanking.sorted.findIndex((s) => s.profile_id === pid);
     return i === -1 ? null : i + 1;
   };
 
