@@ -2,6 +2,7 @@ import { requireApproved } from "@/lib/auth";
 import { BottomTabs } from "@/components/BottomTabs";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { createClient } from "@/lib/supabase/server";
+import { getCityMap } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,12 @@ export default async function AppLayout({
   const me = await requireApproved();
 
   const supabase = createClient();
+  const cityMap = await getCityMap();
+  const activeCities = Array.from(cityMap.values())
+    .filter((c) => c.active)
+    .map((c) => c.name)
+    .sort((a, b) => a.localeCompare(b));
+
   const [{ count: matches }, { count: invites }, { count: directChallenges }] =
     await Promise.all([
       supabase
@@ -40,7 +47,10 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-dvh flex flex-col">
-      <OnboardingOverlay autoShow={!me.onboarding_completed} />
+      <OnboardingOverlay
+        autoShow={!me.onboarding_completed}
+        cities={activeCities}
+      />
       <main className="flex-1 pb-[88px]">{children}</main>
       <BottomTabs
         pendingReplies={

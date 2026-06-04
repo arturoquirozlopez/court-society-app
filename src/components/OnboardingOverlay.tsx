@@ -14,11 +14,19 @@ import { completeOnboarding } from "@/lib/actions/onboarding";
  * `completeOnboarding` is called exactly once per first-time visit
  * (skip or finish — both close the flow and persist the flag).
  */
-export function OnboardingOverlay({ autoShow }: { autoShow: boolean }) {
+export function OnboardingOverlay({
+  autoShow,
+  cities,
+}: {
+  autoShow: boolean;
+  cities: string[];
+}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [, start] = useTransition();
   const persistedRef = useRef(false);
+
+  const slides = buildSlides(cities);
 
   // First-time auto-open
   useEffect(() => {
@@ -36,7 +44,7 @@ export function OnboardingOverlay({ autoShow }: { autoShow: boolean }) {
     }
   }
 
-  const last = step === SLIDES.length - 1;
+  const last = step === slides.length - 1;
 
   return (
     <>
@@ -66,7 +74,7 @@ export function OnboardingOverlay({ autoShow }: { autoShow: boolean }) {
           {/* Header: progress dots + skip */}
           <header className="flex items-center justify-between px-7 pt-5 pb-3">
             <div className="flex gap-1.5">
-              {SLIDES.map((_, i) => (
+              {slides.map((_, i) => (
                 <span
                   key={i}
                   className={`h-[2px] w-5 transition-colors ${
@@ -93,18 +101,18 @@ export function OnboardingOverlay({ autoShow }: { autoShow: boolean }) {
             className="flex-1 flex flex-col items-center justify-center px-7 pb-6 animate-[fadeUp_.35s_ease-out]"
           >
             <div className="text-[9px] tracking-[0.32em] uppercase text-cs-brass mb-8">
-              {SLIDES[step].eyebrow}
+              {slides[step].eyebrow}
             </div>
 
             <div className="mb-10 flex items-center justify-center min-h-[140px]">
-              {SLIDES[step].visual}
+              {slides[step].visual}
             </div>
 
             <h2 className="font-display italic text-[28px] sm:text-[30px] text-cs-green leading-[1.15] text-center max-w-[320px] mb-4">
-              {SLIDES[step].title}
+              {slides[step].title}
             </h2>
             <p className="text-[14px] text-cs-black/75 leading-[1.7] text-center max-w-[320px]">
-              {SLIDES[step].body}
+              {slides[step].body}
             </p>
           </main>
 
@@ -146,47 +154,49 @@ export function OnboardingOverlay({ autoShow }: { autoShow: boolean }) {
 
 /* ────────── slides ────────── */
 
-const SLIDES: {
+function buildSlides(cities: string[]): {
   eyebrow: string;
   title: string;
   body: string;
   visual: React.ReactNode;
-}[] = [
-  {
-    eyebrow: "C O U R T    S O C I E T Y",
-    title: "Your global private tennis network.",
-    body: "Connect with verified members, challenge players, build rivalries and find matches anywhere you travel.",
-    visual: <VisualNetwork />,
-  },
-  {
-    eyebrow: "Challenge",
-    title: "Find your next match.",
-    body: "Browse members in your city or the city you’re visiting and send a challenge with one tap.",
-    visual: <VisualChallenge />,
-  },
-  {
-    eyebrow: "Ranking",
-    title: "Every match counts.",
-    body: "Confirmed match results affect rankings, rivalries and season standings.",
-    visual: <VisualRanking />,
-  },
-  {
-    eyebrow: "Travel",
-    title: "Play anywhere.",
-    body: "When you travel, update your current city and discover local members ready to play.",
-    visual: <VisualTravel />,
-  },
-  {
-    eyebrow: "Head to Head",
-    title: "Build rivalries.",
-    body: "Track your history against other members, compare records and see who leads the rivalry.",
-    visual: <VisualH2H />,
-  },
-];
+}[] {
+  return [
+    {
+      eyebrow: "C O U R T    S O C I E T Y",
+      title: "Your global private tennis network.",
+      body: "Connect with verified members, challenge players, build rivalries and find matches anywhere you travel.",
+      visual: <VisualNetwork cities={cities} />,
+    },
+    {
+      eyebrow: "Challenge",
+      title: "Find your next match.",
+      body: "Browse members in your city or the city you’re visiting and send a challenge with one tap.",
+      visual: <VisualChallenge />,
+    },
+    {
+      eyebrow: "Ranking",
+      title: "Every match counts.",
+      body: "Confirmed match results affect rankings, rivalries and season standings.",
+      visual: <VisualRanking />,
+    },
+    {
+      eyebrow: "Travel",
+      title: "Play anywhere.",
+      body: "When you travel, update your current city and discover local members ready to play.",
+      visual: <VisualTravel cities={cities} />,
+    },
+    {
+      eyebrow: "Head to Head",
+      title: "Build rivalries.",
+      body: "Track your history against other members, compare records and see who leads the rivalry.",
+      visual: <VisualH2H />,
+    },
+  ];
+}
 
 /* ────────── visuals ────────── */
 
-function VisualNetwork() {
+function VisualNetwork({ cities }: { cities: string[] }) {
   return (
     <div className="flex flex-col items-center">
       <svg viewBox="0 0 240 80" className="w-56 h-20" aria-hidden>
@@ -214,11 +224,13 @@ function VisualNetwork() {
           CS
         </text>
       </svg>
-      <div className="flex gap-7 text-[9px] tracking-[0.22em] uppercase text-cs-brass mt-2">
-        <span>Santiago</span>
-        <span>São Paulo</span>
-        <span>Miami</span>
-      </div>
+      {cities.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-x-7 gap-y-1 text-[9px] tracking-[0.22em] uppercase text-cs-brass mt-2 max-w-[280px]">
+          {cities.map((c) => (
+            <span key={c}>{c}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -311,7 +323,12 @@ function VisualRanking() {
   );
 }
 
-function VisualTravel() {
+function VisualTravel({ cities }: { cities: string[] }) {
+  // Picks two active cities to illustrate "home → visiting". Falls back to
+  // a single tile if only one city is active.
+  const from = (cities[0] ?? "Home").toUpperCase();
+  const to = (cities[1] ?? cities[0] ?? "Away").toUpperCase();
+  const fit = (s: string) => (s.length > 11 ? s.slice(0, 10) + "…" : s);
   return (
     <svg viewBox="0 0 260 80" className="w-64 h-20" aria-hidden>
       <rect
@@ -333,7 +350,7 @@ function VisualTravel() {
         fill="#0E2A1F"
         letterSpacing="2"
       >
-        SANTIAGO
+        {fit(from)}
       </text>
       <line
         x1="106"
@@ -346,14 +363,7 @@ function VisualTravel() {
       <text x="130" y="36" textAnchor="middle" fontSize="14" fill="#A68B5B">
         ✈
       </text>
-      <rect
-        x="166"
-        y="28"
-        width="84"
-        height="32"
-        rx="2"
-        fill="#0E2A1F"
-      />
+      <rect x="166" y="28" width="84" height="32" rx="2" fill="#0E2A1F" />
       <text
         x="208"
         y="48"
@@ -363,7 +373,7 @@ function VisualTravel() {
         fill="#F5F1E8"
         letterSpacing="2"
       >
-        MIAMI
+        {fit(to)}
       </text>
     </svg>
   );
