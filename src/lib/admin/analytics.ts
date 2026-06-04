@@ -691,7 +691,7 @@ export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
     elig90.filter((p) => activeWithin(p.id, 90)).length,
     elig90.length,
   );
-  const returning7 = pct(
+  const returning7d = pct(
     elig30.filter((p) => activeWithin(p.id, 7)).length,
     elig30.length,
   );
@@ -710,7 +710,7 @@ export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
     d30,
     d60,
     d90,
-    returning7,
+    returning7d,
     repeatPlayersPct,
   };
 
