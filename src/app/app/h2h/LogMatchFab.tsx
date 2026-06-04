@@ -90,7 +90,7 @@ export function LogMatchFab({ playable }: { playable: PlayableChallenge[] }) {
           reset();
           setOpen(true);
         }}
-        className="fixed bottom-[86px] right-[max(calc(50%-200px),16px)] w-14 h-14 bg-cs-green text-cs-ivory text-2xl flex items-center justify-center shadow-lg z-30"
+        className="lg:hidden fixed bottom-[86px] right-[max(calc(50%-200px),16px)] w-14 h-14 bg-cs-green text-cs-ivory text-2xl flex items-center justify-center shadow-lg z-30"
         aria-label="Log match"
       >
         ＋

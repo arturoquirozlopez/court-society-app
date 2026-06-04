@@ -113,6 +113,21 @@ export function ChallengesClient({
   return (
     <>
       <div>
+        {/* Desktop-only action bar (the mobile FAB is hidden at lg+). */}
+        <div className="hidden lg:flex items-center justify-between px-10 py-5 border-b border-cs-green/10">
+          <span className="text-[11px] tracking-[0.2em] uppercase text-cs-muted">
+            {challenges.length}{" "}
+            {challenges.length === 1 ? "active challenge" : "active challenges"}
+          </span>
+          <button
+            onClick={() => setOpen(true)}
+            className="text-[11px] tracking-[0.2em] uppercase px-5 py-3 bg-cs-green text-cs-ivory relative hover:bg-cs-greenLight transition-colors"
+          >
+            New challenge
+            <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-cs-brass" />
+          </button>
+        </div>
+
         {challenges.length === 0 && (
           <div className="px-7 py-12 text-center">
             <div className="font-display italic text-[18px] text-cs-green">
@@ -315,10 +330,10 @@ export function ChallengesClient({
         })}
       </div>
 
-      {/* FAB */}
+      {/* FAB — mobile only. Desktop uses the action bar above. */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-[86px] right-[max(calc(50%-200px),16px)] w-14 h-14 bg-cs-green text-cs-ivory text-2xl flex items-center justify-center shadow-lg z-30"
+        className="lg:hidden fixed bottom-[86px] right-[max(calc(50%-200px),16px)] w-14 h-14 bg-cs-green text-cs-ivory text-2xl flex items-center justify-center shadow-lg z-30"
         aria-label="New challenge"
       >
         ⚔

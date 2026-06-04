@@ -112,12 +112,27 @@ export default async function DashboardPage() {
   const playedSet = new Set((matchedChIds ?? []).map((m) => m.challenge_id as string));
   const upcoming = accepted.filter((c) => !playedSet.has(c.id)).slice(0, 4);
 
-  const visitingPlans = (visitingRows.data ?? []) as {
+  const visitingPlansRaw = (visitingRows.data ?? []) as {
     profile_id: string;
     city_id: string;
     start_date: string | null;
     end_date: string | null;
   }[];
+  // Need the home_city_id of each visiting profile to filter same-city
+  // "visits". Pull only those ids and drop anyone visiting their own home.
+  const visitorIds = Array.from(new Set(visitingPlansRaw.map((v) => v.profile_id)));
+  const { data: visitorHomeRows } = visitorIds.length
+    ? await supabase
+        .from("profiles")
+        .select("id, home_city_id")
+        .in("id", visitorIds)
+    : { data: [] as { id: string; home_city_id: string | null }[] };
+  const homeByVisitor = new Map<string, string | null>(
+    (visitorHomeRows ?? []).map((r) => [r.id as string, (r.home_city_id ?? null) as string | null]),
+  );
+  const visitingPlans = visitingPlansRaw.filter(
+    (v) => homeByVisitor.get(v.profile_id) !== v.city_id,
+  );
   const openChallenges = (openChallengeRows.data ?? []) as {
     id: string;
     author_id: string;

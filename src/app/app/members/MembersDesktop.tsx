@@ -33,6 +33,27 @@ export function MembersDesktop({
   const [levelFilter, setLevelFilter] = useState<Set<PlayLevel>>(new Set());
   const [search, setSearch] = useState("");
 
+  // Alphabetical sort for filter rails — the chips always feel like a
+  // directory, not "newest-first" data.
+  const sortedCities = useMemo(
+    () => cities.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [cities],
+  );
+  const sortedClubs = useMemo(
+    () => clubs.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [clubs],
+  );
+
+  // A visiting plan is only meaningful when the visitor's home city is
+  // different from the city they're "visiting". Same-city plans (data
+  // hygiene issues) are ignored everywhere in the directory UI.
+  const realVisiting = (m: Profile): string | null => {
+    const v = visitingByProfile[m.id];
+    if (!v) return null;
+    if (m.home_city_id && v === m.home_city_id) return null;
+    return v;
+  };
+
   const toggle = <T,>(set: Set<T>, value: T): Set<T> => {
     const next = new Set(set);
     if (next.has(value)) next.delete(value);
@@ -100,7 +121,8 @@ export function MembersDesktop({
           (m) =>
             m.id !== meId &&
             meHomeCityId &&
-            visitingByProfile[m.id] === meHomeCityId,
+            visitingByProfile[m.id] === meHomeCityId &&
+            m.home_city_id !== meHomeCityId,
         )
         .slice(0, 5),
     [members, meId, meHomeCityId, visitingByProfile],
@@ -133,11 +155,12 @@ export function MembersDesktop({
   const clubName = (id: string | null) =>
     id ? clubs.find((c) => c.id === id)?.name ?? "—" : "—";
 
-  // Only show clubs for cities currently filtered (or all if none).
+  // Only show clubs for cities currently filtered (or all if none),
+  // always in alphabetical order.
   const clubsToShow =
     cityFilter.size === 0
-      ? clubs
-      : clubs.filter((c) => cityFilter.has(c.city_id));
+      ? sortedClubs
+      : sortedClubs.filter((c) => cityFilter.has(c.city_id));
 
   return (
     <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:min-h-dvh">
@@ -165,7 +188,7 @@ export function MembersDesktop({
           {/* Filter rail */}
           <div className="border-r border-cs-green/10 pr-7 flex flex-col gap-7">
             <FilterGroup title="City">
-              {cities.map((c) => (
+              {sortedCities.map((c) => (
                 <FilterChip
                   key={c.id}
                   on={cityFilter.has(c.id)}
@@ -232,53 +255,65 @@ export function MembersDesktop({
             ) : (
               <div className="grid grid-cols-3 gap-4">
                 {filtered.map((m) => {
-                  const visiting = visitingByProfile[m.id];
+                  const visiting = realVisiting(m);
                   return (
                     <Link
                       key={m.id}
                       href={`/app/members/${m.id}`}
-                      className="relative bg-[#FBF8F0] border border-cs-green/10 p-5 flex flex-col gap-3.5 hover:border-cs-brass transition-colors group"
+                      className="relative bg-[#FBF8F0] border border-cs-green/10 p-5 flex flex-col gap-3 hover:border-cs-brass transition-colors group min-h-[176px]"
                     >
-                      {visiting && (
-                        <span className="absolute top-3 right-3 text-[9px] tracking-[0.2em] uppercase text-cs-brass border border-cs-brass px-1.5 py-0.5">
-                          Visiting
-                        </span>
-                      )}
-                      <div className="flex items-center gap-3">
+                      {/* Top row — avatar + name, with right padding so the
+                          badge can never collide with the name */}
+                      <div className={`flex items-start gap-3 ${visiting ? "pr-20" : ""}`}>
                         <Avatar
                           url={m.photo_url}
                           seed={m.id}
                           alt={m.full_name ?? ""}
                           size={44}
                         />
-                        <div className="min-w-0">
-                          <div className="font-display italic text-[17px] text-cs-green leading-tight truncate group-hover:text-cs-brass">
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className="font-display italic text-[16px] text-cs-green leading-tight truncate group-hover:text-cs-brass"
+                            title={m.full_name ?? ""}
+                          >
                             {m.full_name ?? "—"}
                           </div>
                           {m.headline && (
-                            <div className="text-[11px] text-cs-muted truncate mt-0.5">
+                            <div
+                              className="text-[11px] text-cs-muted truncate mt-1"
+                              title={m.headline}
+                            >
                               {m.headline}
                             </div>
                           )}
                         </div>
                       </div>
-                      <div className="text-[10px] tracking-[0.22em] uppercase text-cs-brass">
+
+                      {/* Visiting badge — only when visiting a *different*
+                          city than home */}
+                      {visiting && (
+                        <span className="absolute top-4 right-4 text-[9px] tracking-[0.2em] uppercase text-cs-brass border border-cs-brass px-1.5 py-0.5 bg-[#FBF8F0]">
+                          Visiting
+                        </span>
+                      )}
+
+                      {/* City / route line */}
+                      <div className="text-[10px] tracking-[0.22em] uppercase text-cs-brass truncate">
                         {visiting
                           ? `${cityName(m.home_city_id ?? "")} → ${cityName(visiting)}`
-                          : cityName(m.home_city_id ?? "")}
+                          : cityName(m.home_city_id ?? "") || "—"}
                       </div>
-                      <div className="flex justify-between text-[11px] text-cs-muted border-t border-dashed border-cs-green/15 pt-3 mt-auto">
-                        <span>
-                          <span className="block text-[9px] tracking-[0.18em] uppercase mb-0.5">Level</span>
-                          <b className="font-display italic text-cs-green text-[15px] not-italic">
-                            {m.level ? LEVEL_SHORT[m.level] : "—"}
-                          </b>
+
+                      {/* Bottom row — level chip + club name (truncates) */}
+                      <div className="mt-auto pt-3 border-t border-dashed border-cs-green/15 grid grid-cols-[auto_minmax(0,1fr)] gap-3 items-center">
+                        <span className="px-2 py-0.5 border border-cs-green/30 text-[10px] tracking-[0.16em] uppercase text-cs-green whitespace-nowrap">
+                          {m.level ? LEVEL_SHORT[m.level] : "—"}
                         </span>
-                        <span>
-                          <span className="block text-[9px] tracking-[0.18em] uppercase mb-0.5">Club</span>
-                          <b className="font-display italic text-cs-green text-[13px] truncate max-w-[120px]">
-                            {clubName(m.home_club_id)}
-                          </b>
+                        <span
+                          className="text-[11px] text-cs-muted truncate text-right"
+                          title={clubName(m.home_club_id)}
+                        >
+                          {clubName(m.home_club_id)}
                         </span>
                       </div>
                     </Link>

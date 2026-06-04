@@ -187,8 +187,13 @@ export default async function ProfilePage() {
       ? me.other_club_name
       : clubMap.get(me.home_club_id)?.name ?? "—"
     : "—";
+  // Treat a "visiting" plan that points back at the member's own home city
+  // as no-visit. It only makes sense to surface a visiting label when the
+  // member is actually somewhere else.
   const visitingName =
-    visiting?.city_id ? cityMap.get(visiting.city_id)?.name : null;
+    visiting?.city_id && visiting.city_id !== me.home_city_id
+      ? cityMap.get(visiting.city_id)?.name ?? null
+      : null;
 
   const cities = Array.from(cityMap.entries())
     .filter(([, c]) => c.active)
