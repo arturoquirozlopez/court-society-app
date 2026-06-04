@@ -106,6 +106,7 @@ export interface Profile {
   travel_city_ids: string[];
   nominated_by_text: string | null;
   joined_at: string | null;
+  onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
 }

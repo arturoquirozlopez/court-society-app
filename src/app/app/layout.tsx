@@ -1,5 +1,6 @@
 import { requireApproved } from "@/lib/auth";
 import { BottomTabs } from "@/components/BottomTabs";
+import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-dvh flex flex-col">
+      <OnboardingOverlay autoShow={!me.onboarding_completed} />
       <main className="flex-1 pb-[88px]">{children}</main>
       <BottomTabs
         pendingReplies={
