@@ -79,6 +79,13 @@ export interface Club {
   is_other: boolean;
 }
 
+export type Gender = "M" | "F";
+
+export const GENDER_LABEL: Record<Gender, string> = {
+  M: "Men",
+  F: "Women",
+};
+
 export interface Profile {
   id: string;
   email: string;
@@ -87,6 +94,7 @@ export interface Profile {
   headline: string | null;
   linkedin_url: string | null;
   whatsapp: string | null;
+  gender: Gender | null;
   role: MemberRole;
   status: MemberStatus;
   home_city_id: string | null;

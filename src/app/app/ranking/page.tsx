@@ -138,15 +138,15 @@ export default async function RankingPage() {
     invited_at: myStatusByGroup.get(g.id as string)?.joined_at ?? g.created_at as string,
   }));
 
-  const cities = Array.from(cityMap.entries()).map(([id, c]) => ({
-    id,
-    name: c.name,
-  }));
-  const clubs = Array.from(clubMap.entries()).map(([id, c]) => ({
-    id,
-    name: c.name,
-    city_id: c.city_id,
-  }));
+  // Only active cities / clubs surface in the filter chips. Inactive ones
+  // are still resolvable for display (a member can still belong to a city
+  // that was hidden by admin), but they don't show up as filter options.
+  const cities = Array.from(cityMap.entries())
+    .filter(([, c]) => c.active)
+    .map(([id, c]) => ({ id, name: c.name }));
+  const clubs = Array.from(clubMap.entries())
+    .filter(([, c]) => c.active)
+    .map(([id, c]) => ({ id, name: c.name, city_id: c.city_id }));
 
   return (
     <div>
@@ -159,6 +159,7 @@ export default async function RankingPage() {
         meCityId={me.home_city_id}
         meClubId={me.home_club_id}
         meLevel={me.level}
+        meGender={me.gender}
         players={players}
         cities={cities}
         clubs={clubs}

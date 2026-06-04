@@ -30,8 +30,16 @@ export default async function ApplyPage({
 
   const supabase = createClient();
   const [{ data: cities }, { data: clubs }] = await Promise.all([
-    supabase.from("cities").select("*").order("name"),
-    supabase.from("clubs").select("*").order("name"),
+    supabase
+      .from("cities")
+      .select("*")
+      .eq("active", true)
+      .order("name"),
+    supabase
+      .from("clubs")
+      .select("*")
+      .eq("active", true)
+      .order("name"),
   ]);
 
   return (

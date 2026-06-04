@@ -10,6 +10,7 @@ import {
 } from "@/lib/points";
 import {
   LEVEL_SHORT,
+  type Gender,
   type GroupInvitation,
   type GroupWithContext,
   type PlayLevel,
@@ -39,6 +40,7 @@ export function RankingClient({
   meCityId,
   meClubId,
   meLevel,
+  meGender,
   players,
   cities,
   clubs,
@@ -50,6 +52,7 @@ export function RankingClient({
   meCityId: string | null;
   meClubId: string | null;
   meLevel: PlayLevel | null;
+  meGender: Gender | null;
   players: PlayerRow[];
   cities: { id: string; name: string }[];
   clubs: { id: string; name: string; city_id: string }[];
@@ -57,9 +60,13 @@ export function RankingClient({
   groups: GroupWithContext[];
   invitations: GroupInvitation[];
 }) {
+  type GenderFilter = "M" | "F" | "All";
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [clubFilter, setClubFilter] = useState<string>("all");
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>(
+    meGender ?? "All",
+  );
   const [groupId, setGroupId] = useState<string | null>(null);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [busy, start] = useTransition();
@@ -95,6 +102,7 @@ export function RankingClient({
         }
         if (levelFilter !== "all" && p.level !== levelFilter) return false;
         if (clubFilter !== "all" && p.home_club_id !== clubFilter) return false;
+        if (genderFilter !== "All" && p.gender !== genderFilter) return false;
         return true;
       });
     }
@@ -109,6 +117,7 @@ export function RankingClient({
     cityFilter,
     levelFilter,
     clubFilter,
+    genderFilter,
     visitingByProfile,
   ]);
 
@@ -186,6 +195,29 @@ export function RankingClient({
 
       {!selectedGroup && (
         <>
+          {/* Gender split — defaults to the viewer's own gender. */}
+          <Row>
+            <Chip
+              active={genderFilter === "M"}
+              mine={meGender === "M"}
+              onClick={() => setGenderFilter("M")}
+            >
+              Men{meGender === "M" ? " ★" : ""}
+            </Chip>
+            <Chip
+              active={genderFilter === "F"}
+              mine={meGender === "F"}
+              onClick={() => setGenderFilter("F")}
+            >
+              Women{meGender === "F" ? " ★" : ""}
+            </Chip>
+            <Chip
+              active={genderFilter === "All"}
+              onClick={() => setGenderFilter("All")}
+            >
+              All
+            </Chip>
+          </Row>
           <Row>
             <Chip
               active={cityFilter === "all"}

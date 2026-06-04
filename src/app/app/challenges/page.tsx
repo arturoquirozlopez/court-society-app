@@ -112,11 +112,12 @@ export default async function ChallengesPage() {
     (clubsByChallenge[id] ||= []).push(r.club_id as string);
   }
 
-  const cities = Array.from(cityMap.entries()).map(([id, c]) => ({
-    id,
-    name: c.name,
-  }));
-  const clubs = Array.from(clubMap.entries()).map(([id, c]) => ({
+  const cities = Array.from(cityMap.entries())
+    .filter(([, c]) => c.active)
+    .map(([id, c]) => ({ id, name: c.name }));
+  const clubs = Array.from(clubMap.entries())
+    .filter(([, c]) => c.active)
+    .map(([id, c]) => ({
     id,
     name: c.name,
     city_id: c.city_id,

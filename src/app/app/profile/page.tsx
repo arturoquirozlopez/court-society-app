@@ -145,10 +145,9 @@ export default async function ProfilePage() {
   const visitingName =
     visiting?.city_id ? cityMap.get(visiting.city_id)?.name : null;
 
-  const cities = Array.from(cityMap.entries()).map(([id, c]) => ({
-    id,
-    name: c.name,
-  }));
+  const cities = Array.from(cityMap.entries())
+    .filter(([, c]) => c.active)
+    .map(([id, c]) => ({ id, name: c.name }));
 
   return (
     <div>

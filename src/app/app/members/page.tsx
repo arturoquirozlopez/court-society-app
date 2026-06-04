@@ -36,11 +36,12 @@ export default async function MembersPage() {
   for (const v of vps ?? [])
     visitingByProfile.set(v.profile_id as string, v.city_id as string);
 
-  const cities = Array.from(cityMap.entries()).map(([id, c]) => ({
-    id,
-    name: c.name,
-  }));
-  const clubs = Array.from(clubMap.entries()).map(([id, c]) => ({
+  const cities = Array.from(cityMap.entries())
+    .filter(([, c]) => c.active)
+    .map(([id, c]) => ({ id, name: c.name }));
+  const clubs = Array.from(clubMap.entries())
+    .filter(([, c]) => c.active)
+    .map(([id, c]) => ({
     id,
     name: c.name,
     city_id: c.city_id,

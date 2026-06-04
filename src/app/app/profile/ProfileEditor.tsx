@@ -18,11 +18,18 @@ export function ProfileEditor({
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [values, setValues] = useState({
+  const [values, setValues] = useState<{
+    full_name: string;
+    headline: string;
+    whatsapp: string;
+    linkedin_url: string;
+    gender: "M" | "F" | null;
+  }>({
     full_name: me.full_name ?? "",
     headline: me.headline ?? "",
     whatsapp: me.whatsapp ?? "",
     linkedin_url: me.linkedin_url ?? "",
+    gender: me.gender ?? null,
   });
 
   function save() {
@@ -99,6 +106,33 @@ export function ProfileEditor({
               onChange={(e) => setValues((p) => ({ ...p, linkedin_url: e.target.value }))}
               inputMode="url"
             />
+          </Field>
+          <Field label="Gender — drives default ranking view">
+            <div className="flex gap-2 mt-1">
+              {([
+                { val: "M" as const, label: "Man" },
+                { val: "F" as const, label: "Woman" },
+                { val: null, label: "Prefer not to say" },
+              ]).map((opt) => {
+                const on = values.gender === opt.val;
+                return (
+                  <button
+                    key={String(opt.val)}
+                    type="button"
+                    onClick={() =>
+                      setValues((p) => ({ ...p, gender: opt.val }))
+                    }
+                    className={`text-[11px] px-3 py-1.5 border ${
+                      on
+                        ? "border-cs-green bg-cs-green text-cs-ivory"
+                        : "border-black/10 text-cs-muted"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </Field>
           <button onClick={save} disabled={pending} className="btn-primary">
             {pending ? "Saving…" : "Save"}

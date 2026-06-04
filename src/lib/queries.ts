@@ -90,28 +90,46 @@ export async function getProfilesByIds(ids: string[]): Promise<Profile[]> {
   return (data ?? []) as unknown as Profile[];
 }
 
-/** Cities (id → name) lookup. */
+/** Cities (id → name) lookup. Always returns ALL cities — callers filter
+ * by `active` when building user-facing filter chips / selectors. Inactive
+ * cities still need to be looked up for members whose home_city points to
+ * one (e.g. for display purposes). */
 export async function getCityMap() {
   const supabase = createClient();
-  const { data } = await supabase.from("cities").select("id, name, slug");
-  const map = new Map<string, { name: string; slug: string }>();
-  for (const c of data ?? []) map.set(c.id as string, { name: c.name as string, slug: c.slug as string });
+  const { data } = await supabase
+    .from("cities")
+    .select("id, name, slug, active");
+  const map = new Map<
+    string,
+    { name: string; slug: string; active: boolean }
+  >();
+  for (const c of data ?? [])
+    map.set(c.id as string, {
+      name: c.name as string,
+      slug: c.slug as string,
+      active: Boolean(c.active),
+    });
   return map;
 }
 
-/** Clubs (id → {name, city_id, is_other}) lookup. */
+/** Clubs (id → {name, city_id, is_other, active}) lookup. Same active rule
+ * as getCityMap — callers should filter active=true when building user-facing
+ * selectors. */
 export async function getClubMap() {
   const supabase = createClient();
-  const { data } = await supabase.from("clubs").select("id, name, city_id, is_other");
+  const { data } = await supabase
+    .from("clubs")
+    .select("id, name, city_id, is_other, active");
   const map = new Map<
     string,
-    { name: string; city_id: string; is_other: boolean }
+    { name: string; city_id: string; is_other: boolean; active: boolean }
   >();
   for (const c of data ?? [])
     map.set(c.id as string, {
       name: c.name as string,
       city_id: c.city_id as string,
       is_other: Boolean(c.is_other),
+      active: Boolean(c.active),
     });
   return map;
 }
@@ -167,14 +185,20 @@ export async function getSeasonRanking(seasonId: string): Promise<{
       .eq("status", "confirmed"),
     supabase
       .from("profiles")
-      .select("id, level")
+      .select("id, level, gender")
       .eq("status", "approved"),
   ]);
 
   const levelById = new Map<string, number>();
-  for (const p of (profiles ?? []) as { id: string; level: PlayLevel | null }[]) {
+  const genderById = new Map<string, "M" | "F" | null>();
+  for (const p of (profiles ?? []) as {
+    id: string;
+    level: PlayLevel | null;
+    gender: "M" | "F" | null;
+  }[]) {
     const idx = levelToIdx(p.level);
     if (idx !== null) levelById.set(p.id, idx);
+    genderById.set(p.id, p.gender);
   }
 
   type Bucket = {
@@ -201,15 +225,22 @@ export async function getSeasonRanking(seasonId: string): Promise<{
     const oLvl = levelById.get(m.opponent_id);
     if (aLvl === undefined || oLvl === undefined) continue;
 
+    // Mixed-gender matches still count for activity / decay / form, but
+    // they don't award ranking points (so the per-gender ranking stays
+    // clean).
+    const aGender = genderById.get(m.author_id) ?? null;
+    const oGender = genderById.get(m.opponent_id) ?? null;
+    const mixed = !!(aGender && oGender && aGender !== oGender);
+
     // Author POV
     const authorWon = m.author_result === "W";
     const a = ensure(m.author_id);
-    a.base += basePoints(authorWon, oLvl - aLvl);
+    if (!mixed) a.base += basePoints(authorWon, oLvl - aLvl);
     a.rows.push({ won: authorWon, created_at: m.created_at, oppLevel: oLvl });
 
     // Opponent POV
     const o = ensure(m.opponent_id);
-    o.base += basePoints(!authorWon, aLvl - oLvl);
+    if (!mixed) o.base += basePoints(!authorWon, aLvl - oLvl);
     o.rows.push({ won: !authorWon, created_at: m.created_at, oppLevel: aLvl });
   }
 

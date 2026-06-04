@@ -9,6 +9,7 @@ const ProfilePatch = z.object({
   headline: z.string().max(160).optional(),
   whatsapp: z.string().min(6).max(32).optional(),
   linkedin_url: z.string().url().optional().or(z.literal("")),
+  gender: z.enum(["M", "F"]).nullable().optional(),
 });
 
 export async function updateProfile(values: z.infer<typeof ProfilePatch>) {
@@ -35,11 +36,14 @@ export async function setVisitingCity(cityId: string | null) {
   if (!user) return { ok: false, error: "Not signed in." } as const;
 
   if (!cityId) {
-    // Clear: end-date all open plans
-    const today = new Date().toISOString().slice(0, 10);
+    // Clear: end-date all open plans. Use *yesterday* so the row is
+    // excluded by the `end_date >= today` filter used everywhere.
+    const yesterday = new Date(Date.now() - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
     await supabase
       .from("visiting_plans")
-      .update({ end_date: today })
+      .update({ end_date: yesterday })
       .eq("profile_id", user.id)
       .is("end_date", null);
   } else {

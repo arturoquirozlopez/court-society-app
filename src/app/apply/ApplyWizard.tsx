@@ -44,6 +44,7 @@ export function ApplyWizard({
     full_name: profile.full_name ?? nomination?.nominee_name ?? "",
     headline: profile.headline ?? "",
     linkedin_url: profile.linkedin_url ?? "",
+    gender: profile.gender ?? undefined,
     whatsapp: profile.whatsapp ?? "",
     home_city_id: profile.home_city_id ?? "",
     home_club_id: profile.home_club_id ?? "",
@@ -363,6 +364,34 @@ function StepContact({
           placeholder="https://linkedin.com/in/your-handle"
           inputMode="url"
         />
+      </Field>
+      <Field label="Gender — optional">
+        <div className="flex gap-2 mt-1">
+          {([
+            { val: "M" as const, label: "Man" },
+            { val: "F" as const, label: "Woman" },
+            { val: undefined, label: "Prefer not to say" },
+          ]).map((opt) => {
+            const on = values.gender === opt.val;
+            return (
+              <button
+                key={String(opt.val)}
+                type="button"
+                onClick={() => set("gender", opt.val)}
+                className={`text-[11px] px-3 py-1.5 border ${
+                  on
+                    ? "border-cs-green bg-cs-green text-cs-ivory"
+                    : "border-black/10 text-cs-muted"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-cs-muted mt-2 leading-snug">
+          Used only to show you the ranking of your category by default. You can switch anytime.
+        </p>
       </Field>
     </>
   );

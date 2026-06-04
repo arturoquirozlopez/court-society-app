@@ -480,6 +480,11 @@ export default async function H2hDetail({
                 ? opponent.full_name?.split(" ")[0]
                 : me.full_name?.split(" ")[0];
               const score = (m.score ?? "—").replace(/-/g, "–");
+              const mixed = !!(
+                me.gender &&
+                opponent.gender &&
+                me.gender !== opponent.gender
+              );
               return (
                 <li key={m.id} className="relative pl-7 pb-5">
                   <span
@@ -509,6 +514,14 @@ export default async function H2hDetail({
                         <span className="font-display text-cs-green ml-1">
                           {score}
                         </span>
+                        {mixed && (
+                          <span
+                            className="ml-2 text-[9px] tracking-[0.16em] uppercase text-cs-brass border border-cs-brass/40 px-1 py-0 align-middle"
+                            title="Mixed-gender match — counts for activity, not for ranking points"
+                          >
+                            Mixed
+                          </span>
+                        )}
                       </div>
                       {m.note && (
                         <div className="text-[11px] italic text-cs-muted mt-0.5 leading-snug">
