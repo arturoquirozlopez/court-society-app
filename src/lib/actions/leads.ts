@@ -88,34 +88,25 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
     reminder_sent_at: new Date().toISOString(),
     reminder_count: nextCount,
   };
-  const { data: updData, error: updErr, status: updStatus } = await supabase
+  // Try the normal client first; if RLS / column-shape surprises swallow
+  // the write, fall back to service role so the cooldown still takes
+  // effect and the counter advances.
+  const { data: updData, error: updErr } = await supabase
     .from("profiles")
     .update(updatePayload)
     .eq("id", profileId)
-    .select("id, reminder_count, reminder_sent_at");
-  console.log("[sendLeadReminder] update", {
-    profileId,
-    nextCount,
-    status: updStatus,
-    rowsReturned: updData?.length ?? 0,
-    error: updErr?.message ?? null,
-  });
+    .select("id");
   if (updErr || (updData?.length ?? 0) === 0) {
     console.warn(
-      "[sendLeadReminder] anon client update did not persist — retrying with service role",
-      { error: updErr?.message, rowsReturned: updData?.length ?? 0 },
+      "[sendLeadReminder] anon update did not persist, retrying with service role",
+      { error: updErr?.message },
     );
     try {
       const admin = createServiceClient();
-      const { data: svcData, error: svcErr } = await admin
+      await admin
         .from("profiles")
         .update(updatePayload)
-        .eq("id", profileId)
-        .select("id, reminder_count, reminder_sent_at");
-      console.log("[sendLeadReminder] service-role update", {
-        rowsReturned: svcData?.length ?? 0,
-        error: svcErr?.message ?? null,
-      });
+        .eq("id", profileId);
     } catch (e) {
       console.error("[sendLeadReminder] service-role update threw", e);
     }

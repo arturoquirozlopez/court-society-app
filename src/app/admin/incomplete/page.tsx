@@ -59,17 +59,6 @@ export default async function IncompletePage() {
     .filter((a) => isEmptyPayload(a.payload))
     .map((a) => a.profile_id);
 
-  console.log("[admin/incomplete] diag", {
-    pending_apps: pendingApps.length,
-    payload_samples: pendingApps.slice(0, 3).map((a) => ({
-      pid: a.profile_id,
-      type: typeof a.payload,
-      json: JSON.stringify(a.payload),
-      empty: isEmptyPayload(a.payload),
-    })),
-    incomplete_ids: incompleteProfileIds.length,
-  });
-
   // `select("*")` instead of an explicit column list so we don't crash
   // when migration 0012 hasn't been applied yet — missing columns are
   // returned as `undefined`, not as an error.
@@ -104,11 +93,6 @@ export default async function IncompletePage() {
         created_at: String(r.created_at ?? ""),
       }) satisfies Row,
   );
-
-  console.log("[admin/incomplete] leads", {
-    requested: incompleteProfileIds,
-    fetched: leads.map((l) => ({ id: l.id, email: l.email })),
-  });
 
   /* ── Right-rail KPIs ── */
   const now = Date.now();
