@@ -16,7 +16,10 @@ const ApplicationSchema = z.object({
       (u) => /linkedin\.com\//i.test(u),
       "URL must be a LinkedIn profile (linkedin.com/in/...)",
     ),
-  gender: z.enum(["M", "F"]),
+  // Optional in the form schema so the wizard's draft state can carry an
+  // undefined value before the user picks Man or Woman. The submit action
+  // enforces non-null below — the field is mandatory at submit time.
+  gender: z.enum(["M", "F"]).optional(),
   whatsapp: z
     .string()
     .min(6, "WhatsApp with country code is required.")
@@ -66,6 +69,15 @@ export async function submitApplication(
     };
   }
   const v = parsed.data;
+
+  // Server-side enforcement that the wizard can't bypass.
+  if (v.gender !== "M" && v.gender !== "F") {
+    return {
+      ok: false,
+      error: "Please select Man or Woman.",
+      fieldErrors: { gender: ["Required."] },
+    };
+  }
 
   // Update profile fields (RLS: self can update their own row, except role/status)
   const { error: profileErr } = await supabase
