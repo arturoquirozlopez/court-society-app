@@ -2,6 +2,7 @@ import { requireApproved } from "@/lib/auth";
 import { BottomTabs } from "@/components/BottomTabs";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
+import { SetPasswordBanner } from "@/components/SetPasswordBanner";
 import { createClient } from "@/lib/supabase/server";
 import {
   getActiveSeason,
@@ -113,6 +114,7 @@ export default async function AppLayout({
       {/* Page content. Mobile keeps bottom-tabs spacing; on desktop the
           tabs are hidden so we drop the bottom padding. */}
       <div className="flex flex-col min-h-dvh">
+        <SetPasswordBanner visible={me.password_set_at === null} />
         <main className="flex-1 pb-[88px] lg:pb-0 lg:bg-cs-ivory">
           {children}
         </main>

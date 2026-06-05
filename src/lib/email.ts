@@ -126,6 +126,40 @@ function reviewerNote(note: string): string {
 
 /* ────────── Public API ────────── */
 
+/**
+ * Reminder email sent from the admin Incomplete Applications panel.
+ * Tone: private, elegant, short. Single CTA back into /apply.
+ */
+export async function sendApplicationReminder(opts: {
+  to: string;
+  firstName?: string;
+}) {
+  const r = getResend();
+  if (!r) return;
+  const name = opts.firstName ? escapeHtml(opts.firstName) : "";
+  const greeting = name ? `Dear ${name},` : "Dear applicant,";
+  const html = shell({
+    preheader: "A few moments to finish what you started.",
+    title: "Complete your application.",
+    body:
+      paragraph(greeting) +
+      paragraph(
+        "You began your application to Court Society, but it has not yet been completed.",
+      ) +
+      paragraph(
+        "Applications are reviewed individually by the Steward&rsquo;s Office, and only completed applications can be considered for membership.",
+      ) +
+      paragraph("You may continue your application below."),
+    cta: { label: "Continue application", url: `${APP_URL}/apply` },
+  });
+  await r.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject: "Complete your Court Society application",
+    html,
+  });
+}
+
 export async function sendApplicationReceived(opts: {
   to: string;
   firstName?: string;

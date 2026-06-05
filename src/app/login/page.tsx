@@ -61,8 +61,8 @@ export default async function LoginPage({
               </div>
             )}
             <p className="text-[13.5px] leading-[1.78] text-[#4a4840] mb-6">
-              Enter your email to begin your application. We&rsquo;ll send you a
-              one-time sign-in link.
+              Create an account to begin your application — you&rsquo;ll go
+              straight to the form, no email round-trip required.
             </p>
           </>
         ) : (
@@ -72,13 +72,11 @@ export default async function LoginPage({
           </p>
         )}
         <div className="w-8 h-px bg-cs-brass my-6" />
-        <LoginForm initialError={searchParams.e} next={searchParams.next} />
-        <p className="text-[11px] text-cs-muted leading-relaxed mt-6">
-          Open the sign-in link <strong>on the same device</strong> where you
-          requested it. Mobile mail clients sometimes open links in a separate
-          browser — if that happens, copy the URL and paste it into the browser
-          you started in.
-        </p>
+        <LoginForm
+          initialError={searchParams.e}
+          next={searchParams.next}
+          defaultMode={nominatorName ? "signup" : "signin"}
+        />
       </div>
     </div>
   );

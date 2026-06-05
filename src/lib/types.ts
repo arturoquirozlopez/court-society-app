@@ -10,6 +10,15 @@ export type MemberStatus =
   | "waitlisted"
   | "rejected";
 
+/** Funnel state introduced with the auth redesign (migration 0012). */
+export type ApplicationStatus =
+  | "account_created"
+  | "application_started"
+  | "application_submitted"
+  | "approved"
+  | "waitlisted"
+  | "rejected";
+
 export type MemberRole = "member" | "steward" | "admin";
 
 export type PlayLevel =
@@ -108,6 +117,13 @@ export interface Profile {
   joined_at: string | null;
   onboarding_completed: boolean;
   last_seen_at: string | null;
+  application_status: ApplicationStatus;
+  application_started_at: string | null;
+  application_submitted_at: string | null;
+  application_step: number;
+  reminder_sent_at: string | null;
+  reminder_count: number;
+  password_set_at: string | null;
   created_at: string;
   updated_at: string;
 }

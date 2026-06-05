@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { submitApplication, type ApplicationFormValues } from "@/lib/actions/application";
+import {
+  saveApplicationStep,
+  submitApplication,
+  type ApplicationFormValues,
+} from "@/lib/actions/application";
 import {
   type City,
   type Club,
@@ -157,7 +161,16 @@ export function ApplyWizard({
         {error && <p className="text-[12px] text-cs-loss mt-4">{error}</p>}
 
         <button
-          onClick={() => (step < STEPS.length - 1 ? setStep(step + 1) : onSubmit())}
+          onClick={() => {
+            if (step < STEPS.length - 1) {
+              const next = step + 1;
+              setStep(next);
+              // fire-and-forget — feeds the admin "completion %" column
+              void saveApplicationStep(next);
+            } else {
+              onSubmit();
+            }
+          }}
           disabled={!canNext || pending}
           className="btn-primary mt-6"
         >

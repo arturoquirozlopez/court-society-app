@@ -98,6 +98,17 @@ export async function submitApplication(
 
   if (appErr) return { ok: false, error: appErr.message };
 
+  // Mark the funnel as "submitted" so the admin queue can sort completed
+  // applications away from incomplete leads.
+  await supabase
+    .from("profiles")
+    .update({
+      application_status: "application_submitted",
+      application_submitted_at: new Date().toISOString(),
+      application_step: 4,
+    })
+    .eq("id", user.id);
+
   // If the applicant arrived via a nomination link, mark that nomination
   // as "applied" and connect it to this profile. Done with the service role
   // because the nominee may not have visibility into the nominations row
@@ -125,4 +136,21 @@ export async function submitApplication(
 
   revalidatePath("/pending");
   redirect("/pending");
+}
+
+/**
+ * Lightweight progress signal — called fire-and-forget by the wizard each
+ * time the user advances. Feeds the admin "completion %" column.
+ */
+export async function saveApplicationStep(step: number) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false } as const;
+  const clamped = Math.max(0, Math.min(4, Math.floor(step)));
+  await supabase
+    .from("profiles")
+    .update({ application_step: clamped })
+    .eq("id", user.id)
+    .lt("application_step", clamped); // never go backward
+  return { ok: true } as const;
 }

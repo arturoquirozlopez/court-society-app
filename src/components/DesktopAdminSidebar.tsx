@@ -11,6 +11,7 @@ import { SignOutLink } from "@/components/SignOutLink";
  */
 const NAV = [
   { href: "/admin/analytics", icon: "▦", label: "Analytics" },
+  { href: "/admin/incomplete", icon: "◴", label: "Incomplete" },
   { href: "/admin/applications", icon: "✦", label: "Applications" },
   { href: "/admin/members", icon: "◇", label: "Members" },
   { href: "/admin/groups", icon: "⌘", label: "Groups" },

@@ -29,6 +29,19 @@ export default async function ApplyPage({
     : null;
 
   const supabase = createClient();
+
+  // Mark "application started" the first time the user lands here, so the
+  // admin Incomplete Applications queue surfaces them as soon as they
+  // appear (instead of waiting for a submit that may never come).
+  if (profile.application_status === "account_created") {
+    await supabase
+      .from("profiles")
+      .update({
+        application_status: "application_started",
+        application_started_at: new Date().toISOString(),
+      })
+      .eq("id", profile.id);
+  }
   const [{ data: cities }, { data: clubs }] = await Promise.all([
     supabase
       .from("cities")
