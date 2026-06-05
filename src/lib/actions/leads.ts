@@ -18,18 +18,28 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
   await requireAdmin();
   const supabase = createClient();
 
-  const { data: lead } = await supabase
+  // `select("*")` so we don't crash when migration 0012 hasn't yet added
+  // the reminder columns. Cast through Record so missing columns surface
+  // as `undefined`, not as a query error.
+  const { data: leadRaw, error: leadErr } = await supabase
     .from("profiles")
-    .select("id, email, full_name, reminder_sent_at")
+    .select("*")
     .eq("id", profileId)
     .maybeSingle();
-  if (!lead) return { ok: false, error: "Lead not found." };
-  const row = lead as {
-    id: string;
-    email: string;
-    full_name: string | null;
-    reminder_sent_at: string | null;
+  if (leadErr) {
+    console.error("[sendLeadReminder] profile lookup failed", leadErr);
+    return { ok: false, error: leadErr.message };
+  }
+  if (!leadRaw) return { ok: false, error: "Lead not found." };
+  const r = leadRaw as Record<string, unknown>;
+  const row = {
+    id: String(r.id ?? ""),
+    email: String(r.email ?? ""),
+    full_name: (r.full_name as string | null) ?? null,
+    reminder_sent_at: (r.reminder_sent_at as string | null) ?? null,
   };
+  if (!row.email)
+    return { ok: false, error: "Lead has no email on file." };
 
   // Source of truth: the application row. Status must still be pending and
   // payload must be empty (legacy magic-link users may have payload='{}'
@@ -69,13 +79,20 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
     };
   }
 
-  await supabase
+  // Best-effort bookkeeping: log it if it fails (most likely because
+  // migration 0012 hasn't been applied yet — the email already went out).
+  const { error: updErr } = await supabase
     .from("profiles")
     .update({
       reminder_sent_at: new Date().toISOString(),
       reminder_count: (await currentReminderCount(profileId)) + 1,
     })
     .eq("id", profileId);
+  if (updErr)
+    console.warn(
+      "[sendLeadReminder] reminder counters not persisted (migration 0012 likely pending)",
+      updErr.message,
+    );
   revalidatePath("/admin/incomplete");
   return { ok: true };
 }
@@ -132,13 +149,11 @@ async function terminate(
 ): Promise<Result> {
   await requireAdmin();
   const supabase = createClient();
-  // Update profile + the underlying application atomically (best-effort).
-  const { error: pErr } = await supabase
-    .from("profiles")
-    .update({ application_status: "rejected" })
-    .eq("id", profileId);
-  if (pErr) return { ok: false, error: pErr.message };
 
+  // Source of truth for "lead is no longer in the queue" is the application
+  // row (legacy column). The sync trigger on `applications.status` will
+  // mirror onto profiles.status and profiles.application_status if those
+  // columns exist; we don't need to touch profiles ourselves.
   const { error: aErr } = await supabase
     .from("applications")
     .update({
@@ -149,6 +164,18 @@ async function terminate(
     .eq("profile_id", profileId)
     .eq("status", "pending");
   if (aErr) return { ok: false, error: aErr.message };
+
+  // Best-effort: try to flip application_status directly too. If migration
+  // 0012 hasn't landed, the column is missing and we skip silently.
+  const { error: pErr } = await supabase
+    .from("profiles")
+    .update({ application_status: "rejected" })
+    .eq("id", profileId);
+  if (pErr)
+    console.warn(
+      "[terminate] application_status update skipped (migration 0012 likely pending)",
+      pErr.message,
+    );
 
   revalidatePath("/admin/incomplete");
   return { ok: true };
