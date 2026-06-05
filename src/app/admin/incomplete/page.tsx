@@ -70,17 +70,40 @@ export default async function IncompletePage() {
     incomplete_ids: incompleteProfileIds.length,
   });
 
-  const { data: leadsData } = incompleteProfileIds.length
+  // `select("*")` instead of an explicit column list so we don't crash
+  // when migration 0012 hasn't been applied yet — missing columns are
+  // returned as `undefined`, not as an error.
+  const leadsResult = incompleteProfileIds.length
     ? await supabase
         .from("profiles")
-        .select(
-          "id, email, full_name, home_city_id, home_club_id, application_status, application_step, application_started_at, last_seen_at, reminder_sent_at, reminder_count, created_at",
-        )
+        .select("*")
         .in("id", incompleteProfileIds)
         .order("created_at", { ascending: false })
-    : { data: [] as Row[] };
+    : { data: [] as Record<string, unknown>[], error: null };
 
-  const leads = (leadsData ?? []) as Row[];
+  if (leadsResult.error) {
+    console.error("[admin/incomplete] profiles fetch failed", leadsResult.error);
+  }
+
+  const leads = ((leadsResult.data ?? []) as Record<string, unknown>[]).map(
+    (r) =>
+      ({
+        id: String(r.id ?? ""),
+        email: String(r.email ?? ""),
+        full_name: (r.full_name as string | null) ?? null,
+        home_city_id: (r.home_city_id as string | null) ?? null,
+        home_club_id: (r.home_club_id as string | null) ?? null,
+        application_status:
+          (r.application_status as string | null) ?? "account_created",
+        application_step: Number(r.application_step ?? 0),
+        application_started_at:
+          (r.application_started_at as string | null) ?? null,
+        last_seen_at: (r.last_seen_at as string | null) ?? null,
+        reminder_sent_at: (r.reminder_sent_at as string | null) ?? null,
+        reminder_count: Number(r.reminder_count ?? 0),
+        created_at: String(r.created_at ?? ""),
+      }) satisfies Row,
+  );
 
   console.log("[admin/incomplete] leads", {
     requested: incompleteProfileIds,
