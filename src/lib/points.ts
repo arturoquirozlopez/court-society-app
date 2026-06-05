@@ -1,11 +1,15 @@
 /**
- * Court Society Points — scoring system.
+ * Court Society Points — scoring system (v2).
  *
  *  total_points = sum(base_points_per_match) × activity_multiplier × decay_factor
  *
  * Activity multiplier rewards regular play; decay penalises long absence.
- * Base points reward beating stronger opponents disproportionately, so a
- * member can climb by playing up — not by farming below-level matches.
+ *
+ * Base points (v2) depend ONLY on the absolute level of the opponent —
+ * not on the difference between players. The same win against a Former
+ * Pro is worth +200 whether you're a Beginner or a Former Pro yourself,
+ * so the table is easier to read and rankings are directly comparable
+ * across the whole community.
  *
  * Pure functions: no DB access here. Server-side aggregation lives in
  * `getSeasonRanking()` in `queries.ts`.
@@ -40,25 +44,37 @@ export function levelToIdx(
   return LEVEL_IDX[level] ?? null;
 }
 
-/* ────────── Base points ────────── */
+/* ────────── Base points (v2) ────────── */
 
 /**
- * Points for a single match.
- * `levelDiff = opponent_level - player_level` from the scoring player's POV.
- * - Positive diff → opponent is higher rated → bigger reward for winning, less penalty for losing.
- * - Negative diff (rival below) → small reward / heavy penalty.
+ * Points for a single match — depends ONLY on `opponentLevelIdx` (0–5).
+ * The scoring player's own level does not enter the calculation.
+ *
+ * Examples:
+ *   basePoints(true,  5) === 200  // beat a Former Pro
+ *   basePoints(true,  0) ===  20  // beat a Beginner
+ *   basePoints(false, 5) ===  75  // lose to a Former Pro
  */
-export function basePoints(won: boolean, levelDiff: number): number {
-  if (won) {
-    if (levelDiff >= 2) return 220;
-    if (levelDiff === 1) return 150;
-    if (levelDiff === 0) return 100;
-    return 60; // levelDiff <= -1
-  }
-  if (levelDiff >= 2) return 65;
-  if (levelDiff === 1) return 45;
-  if (levelDiff === 0) return 20;
-  return 5; // levelDiff <= -1
+const WIN_BY_LEVEL: Record<number, number> = {
+  0: 20,
+  1: 40,
+  2: 70,
+  3: 100,
+  4: 150,
+  5: 200,
+};
+const LOSS_BY_LEVEL: Record<number, number> = {
+  0: 5,
+  1: 10,
+  2: 20,
+  3: 35,
+  4: 55,
+  5: 75,
+};
+
+export function basePoints(won: boolean, opponentLevelIdx: number): number {
+  const idx = Math.max(0, Math.min(5, Math.floor(opponentLevelIdx)));
+  return won ? (WIN_BY_LEVEL[idx] ?? 0) : (LOSS_BY_LEVEL[idx] ?? 0);
 }
 
 /* ────────── Activity multiplier ────────── */
@@ -88,7 +104,7 @@ export function decayFactor(daysSinceLast: number): number {
 /** "1 840 pts" — thin-space thousand separator. */
 export function formatPoints(n: number): string {
   const v = Math.round(n);
-  return v.toLocaleString("fr-FR").replace(/ /g, " ") + " pts";
+  return v.toLocaleString("fr-FR").replace(/ /g, " ") + " pts";
 }
 
 /** Round a multiplier for display (×1.10, ×1.25, …). */
@@ -100,21 +116,36 @@ export function formatMultiplier(m: number): string {
 
 export type BaseRow = {
   won: boolean;
-  diff: number;
+  oppLevel: number;
   label: string;
   points: number;
 };
 
-export const BASE_POINTS_TABLE: BaseRow[] = [
-  { won: true,  diff:  0, label: "Victory · same level",          points: 100 },
-  { won: true,  diff:  1, label: "Victory · rival 1 level above", points: 150 },
-  { won: true,  diff:  2, label: "Victory · rival 2+ levels above", points: 220 },
-  { won: true,  diff: -1, label: "Victory · rival 1 level below", points: 60 },
-  { won: false, diff:  0, label: "Defeat · same level",           points: 20 },
-  { won: false, diff:  1, label: "Defeat · rival 1 level above",  points: 45 },
-  { won: false, diff:  2, label: "Defeat · rival 2+ levels above", points: 65 },
-  { won: false, diff: -1, label: "Defeat · rival 1 level below",  points: 5 },
-];
+const LEVEL_LABEL_SHORT: Record<number, string> = {
+  0: "Beginner",
+  1: "Recreational 2.5–3.0",
+  2: "Intermediate 3.0–3.5",
+  3: "Strong club 4.0–4.5",
+  4: "Competitive 5.0+",
+  5: "Former pro",
+};
+
+export const BASE_POINTS_TABLE: BaseRow[] = (
+  [0, 1, 2, 3, 4, 5] as const
+).flatMap((idx) => [
+  {
+    won: true,
+    oppLevel: idx,
+    label: `Beat ${LEVEL_LABEL_SHORT[idx]}`,
+    points: WIN_BY_LEVEL[idx],
+  },
+  {
+    won: false,
+    oppLevel: idx,
+    label: `Lose to ${LEVEL_LABEL_SHORT[idx]}`,
+    points: LOSS_BY_LEVEL[idx],
+  },
+]);
 
 export const ACTIVITY_TABLE = [
   { range: "0–1 matches / 30d", mult: 1.0 },

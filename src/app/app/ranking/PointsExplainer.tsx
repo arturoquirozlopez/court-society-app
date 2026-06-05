@@ -13,19 +13,22 @@ import {
 } from "@/lib/points";
 
 /**
- * Interactive points simulator — three dimensions (result+diff, activity, decay)
- * compose into a final points number that updates live.
+ * Interactive points simulator — three dimensions (result + opponent level,
+ * activity, decay) compose into a final points number that updates live.
+ *
+ * v2: base points depend only on the opponent's absolute level, not on the
+ * difference between players.
  */
 export function PointsExplainer() {
   const [won, setWon] = useState<boolean>(true);
-  const [diff, setDiff] = useState<number>(0);
+  const [oppLevel, setOppLevel] = useState<number>(2); // default Intermediate
   const [activityIdx, setActivityIdx] = useState<number>(2); // default 3-4
   const [decayIdx, setDecayIdx] = useState<number>(0); // default 0-29
 
   const activityMatches = [0, 2, 3, 5, 7][activityIdx];
   const decayDays = [0, 30, 45, 60, 75][decayIdx];
 
-  const base = useMemo(() => basePoints(won, diff), [won, diff]);
+  const base = useMemo(() => basePoints(won, oppLevel), [won, oppLevel]);
   const mult = useMemo(() => activityMultiplier(activityMatches), [activityMatches]);
   const dec = useMemo(() => decayFactor(decayDays), [decayDays]);
   const total = Math.round(base * mult * dec);
@@ -36,9 +39,9 @@ export function PointsExplainer() {
         How Court Society Points work
       </div>
       <p className="text-[12.5px] text-cs-black/75 leading-relaxed mb-5">
-        Beat someone above you to climb fast. Win regularly to compound. Take
-        a long break and points slowly decay. Former pros aren&rsquo;t
-        rewarded for playing down — the ranking measures activity, not status.
+        Points depend only on who you played. Beat a higher-rated opponent
+        and you earn more, no matter your own level. Win regularly to
+        compound. Take a long break and points slowly decay.
       </p>
 
       {/* SIMULATOR */}
@@ -75,15 +78,17 @@ export function PointsExplainer() {
             onChange={setWon}
           />
           <SimulatorGroup
-            label="Rival level"
+            label="Opponent level"
             options={[
-              { val: -1, label: "−1 below" },
-              { val: 0, label: "Same" },
-              { val: 1, label: "+1 above" },
-              { val: 2, label: "+2 above" },
+              { val: 0, label: "Beg" },
+              { val: 1, label: "Rec" },
+              { val: 2, label: "Int" },
+              { val: 3, label: "Strong" },
+              { val: 4, label: "Comp" },
+              { val: 5, label: "Pro" },
             ]}
-            selected={diff}
-            onChange={setDiff}
+            selected={oppLevel}
+            onChange={setOppLevel}
           />
           <SimulatorGroup
             label="Activity"

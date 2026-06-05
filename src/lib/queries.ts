@@ -232,15 +232,15 @@ export async function getSeasonRanking(seasonId: string): Promise<{
     const oGender = genderById.get(m.opponent_id) ?? null;
     const mixed = !!(aGender && oGender && aGender !== oGender);
 
-    // Author POV
+    // Author POV — v2 uses the opponent's absolute level only.
     const authorWon = m.author_result === "W";
     const a = ensure(m.author_id);
-    if (!mixed) a.base += basePoints(authorWon, oLvl - aLvl);
+    if (!mixed) a.base += basePoints(authorWon, oLvl);
     a.rows.push({ won: authorWon, created_at: m.created_at, oppLevel: oLvl });
 
     // Opponent POV
     const o = ensure(m.opponent_id);
-    if (!mixed) o.base += basePoints(!authorWon, aLvl - oLvl);
+    if (!mixed) o.base += basePoints(!authorWon, aLvl);
     o.rows.push({ won: !authorWon, created_at: m.created_at, oppLevel: aLvl });
   }
 
