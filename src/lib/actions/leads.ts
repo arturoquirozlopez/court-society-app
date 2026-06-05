@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
 import { sendApplicationReminder } from "@/lib/email";
 
@@ -79,20 +79,47 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
     };
   }
 
-  // Best-effort bookkeeping: log it if it fails (most likely because
-  // migration 0012 hasn't been applied yet — the email already went out).
-  const { error: updErr } = await supabase
+  // Increment the counter. The email already left; this just persists the
+  // bookkeeping. If the normal client update fails (RLS surprise / column
+  // missing), fall back to the service-role client so the cooldown still
+  // takes effect and the counter advances.
+  const nextCount = (await currentReminderCount(profileId)) + 1;
+  const updatePayload = {
+    reminder_sent_at: new Date().toISOString(),
+    reminder_count: nextCount,
+  };
+  const { data: updData, error: updErr, status: updStatus } = await supabase
     .from("profiles")
-    .update({
-      reminder_sent_at: new Date().toISOString(),
-      reminder_count: (await currentReminderCount(profileId)) + 1,
-    })
-    .eq("id", profileId);
-  if (updErr)
+    .update(updatePayload)
+    .eq("id", profileId)
+    .select("id, reminder_count, reminder_sent_at");
+  console.log("[sendLeadReminder] update", {
+    profileId,
+    nextCount,
+    status: updStatus,
+    rowsReturned: updData?.length ?? 0,
+    error: updErr?.message ?? null,
+  });
+  if (updErr || (updData?.length ?? 0) === 0) {
     console.warn(
-      "[sendLeadReminder] reminder counters not persisted (migration 0012 likely pending)",
-      updErr.message,
+      "[sendLeadReminder] anon client update did not persist — retrying with service role",
+      { error: updErr?.message, rowsReturned: updData?.length ?? 0 },
     );
+    try {
+      const admin = createServiceClient();
+      const { data: svcData, error: svcErr } = await admin
+        .from("profiles")
+        .update(updatePayload)
+        .eq("id", profileId)
+        .select("id, reminder_count, reminder_sent_at");
+      console.log("[sendLeadReminder] service-role update", {
+        rowsReturned: svcData?.length ?? 0,
+        error: svcErr?.message ?? null,
+      });
+    } catch (e) {
+      console.error("[sendLeadReminder] service-role update threw", e);
+    }
+  }
   revalidatePath("/admin/incomplete");
   return { ok: true };
 }
