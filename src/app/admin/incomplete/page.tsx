@@ -50,9 +50,25 @@ export default async function IncompletePage() {
     getClubMap(),
   ]);
 
-  const incompleteProfileIds = (appsData ?? [])
+  const pendingApps = (appsData ?? []) as {
+    profile_id: string;
+    payload: unknown;
+    created_at: string;
+  }[];
+  const incompleteProfileIds = pendingApps
     .filter((a) => isEmptyPayload(a.payload))
-    .map((a) => a.profile_id as string);
+    .map((a) => a.profile_id);
+
+  console.log("[admin/incomplete] diag", {
+    pending_apps: pendingApps.length,
+    payload_samples: pendingApps.slice(0, 3).map((a) => ({
+      pid: a.profile_id,
+      type: typeof a.payload,
+      json: JSON.stringify(a.payload),
+      empty: isEmptyPayload(a.payload),
+    })),
+    incomplete_ids: incompleteProfileIds.length,
+  });
 
   const { data: leadsData } = incompleteProfileIds.length
     ? await supabase
@@ -65,6 +81,11 @@ export default async function IncompletePage() {
     : { data: [] as Row[] };
 
   const leads = (leadsData ?? []) as Row[];
+
+  console.log("[admin/incomplete] leads", {
+    requested: incompleteProfileIds,
+    fetched: leads.map((l) => ({ id: l.id, email: l.email })),
+  });
 
   /* ── Right-rail KPIs ── */
   const now = Date.now();
