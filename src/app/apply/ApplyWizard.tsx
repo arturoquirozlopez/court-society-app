@@ -85,7 +85,8 @@ export function ApplyWizard({
       return Boolean(
         values.full_name.trim().length >= 2 &&
           values.whatsapp.trim().length >= 6 &&
-          liOk,
+          liOk &&
+          (values.gender === "M" || values.gender === "F"),
       );
     }
     if (step === 3) return true;
@@ -378,12 +379,11 @@ function StepContact({
           inputMode="url"
         />
       </Field>
-      <Field label="Gender — optional">
+      <Field label="Gender">
         <div className="flex gap-2 mt-1">
           {([
             { val: "M" as const, label: "Man" },
             { val: "F" as const, label: "Woman" },
-            { val: undefined, label: "Prefer not to say" },
           ]).map((opt) => {
             const on = values.gender === opt.val;
             return (

@@ -20,7 +20,7 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
 
   const { data: lead } = await supabase
     .from("profiles")
-    .select("id, email, full_name, application_status, reminder_sent_at")
+    .select("id, email, full_name, status, reminder_sent_at")
     .eq("id", profileId)
     .maybeSingle();
   if (!lead) return { ok: false, error: "Lead not found." };
@@ -28,14 +28,22 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
     id: string;
     email: string;
     full_name: string | null;
-    application_status: string;
+    status: string;
     reminder_sent_at: string | null;
   };
-  if (
-    row.application_status !== "account_created" &&
-    row.application_status !== "application_started"
-  )
+  if (row.status !== "pending")
     return { ok: false, error: "Lead is no longer incomplete." };
+
+  // Confirm the application is actually empty (payload-driven, so we don't
+  // depend on application_status classification).
+  const { data: appRow } = await supabase
+    .from("applications")
+    .select("payload")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  const payload = (appRow as { payload?: Record<string, unknown> | null } | null)?.payload;
+  if (payload && Object.keys(payload).length > 0)
+    return { ok: false, error: "Application is already submitted." };
 
   if (row.reminder_sent_at) {
     const last = new Date(row.reminder_sent_at).getTime();

@@ -16,7 +16,7 @@ const ApplicationSchema = z.object({
       (u) => /linkedin\.com\//i.test(u),
       "URL must be a LinkedIn profile (linkedin.com/in/...)",
     ),
-  gender: z.enum(["M", "F"]).optional(),
+  gender: z.enum(["M", "F"]),
   whatsapp: z
     .string()
     .min(6, "WhatsApp with country code is required.")
