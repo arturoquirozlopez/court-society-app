@@ -20,7 +20,7 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
 
   const { data: lead } = await supabase
     .from("profiles")
-    .select("id, email, full_name, status, reminder_sent_at")
+    .select("id, email, full_name, reminder_sent_at")
     .eq("id", profileId)
     .maybeSingle();
   if (!lead) return { ok: false, error: "Lead not found." };
@@ -28,21 +28,23 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
     id: string;
     email: string;
     full_name: string | null;
-    status: string;
     reminder_sent_at: string | null;
   };
-  if (row.status !== "pending")
-    return { ok: false, error: "Lead is no longer incomplete." };
 
-  // Confirm the application is actually empty (payload-driven, so we don't
-  // depend on application_status classification).
+  // Source of truth: the application row. Status must still be pending and
+  // payload must be empty (legacy magic-link users may have payload='{}'
+  // exactly as the trigger seeded it).
   const { data: appRow } = await supabase
     .from("applications")
-    .select("payload")
+    .select("status, payload")
     .eq("profile_id", profileId)
     .maybeSingle();
-  const payload = (appRow as { payload?: Record<string, unknown> | null } | null)?.payload;
-  if (payload && Object.keys(payload).length > 0)
+  if (!appRow)
+    return { ok: false, error: "No application row for this lead." };
+  const app = appRow as { status: string; payload: unknown };
+  if (app.status !== "pending")
+    return { ok: false, error: "Lead is no longer pending." };
+  if (!isEmptyPayload(app.payload))
     return { ok: false, error: "Application is already submitted." };
 
   if (row.reminder_sent_at) {
@@ -76,6 +78,24 @@ export async function sendLeadReminder(profileId: string): Promise<Result> {
     .eq("id", profileId);
   revalidatePath("/admin/incomplete");
   return { ok: true };
+}
+
+function isEmptyPayload(p: unknown): boolean {
+  if (p === null || p === undefined) return true;
+  if (typeof p === "object") return Object.keys(p as object).length === 0;
+  if (typeof p === "string") {
+    if (p === "" || p === "{}" || p === "null") return true;
+    try {
+      const parsed = JSON.parse(p);
+      return (
+        parsed === null ||
+        (typeof parsed === "object" && Object.keys(parsed).length === 0)
+      );
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 async function currentReminderCount(profileId: string): Promise<number> {

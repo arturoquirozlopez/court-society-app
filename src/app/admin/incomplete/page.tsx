@@ -20,30 +20,12 @@ export default async function IncompletePage() {
   await requireAdmin();
   const supabase = createClient();
 
-  // Incomplete = any not-yet-decided profile (status='pending') whose
-  // application has NOT actually been filled in. We treat the application
-  // payload as the source of truth so legacy magic-link users (who never
-  // got the new application_status flag) still show up, even if the 0012
-  // backfill misclassified them.
-  const [{ data: leadsData }, cityMap, clubMap] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(
-        "id, email, full_name, home_city_id, home_club_id, status, application_status, application_step, application_started_at, last_seen_at, reminder_sent_at, reminder_count, created_at",
-      )
-      .eq("status", "pending")
-      .order("created_at", { ascending: false }),
-    getCityMap(),
-    getClubMap(),
-  ]);
-
   type Row = {
     id: string;
     email: string;
     full_name: string | null;
     home_city_id: string | null;
     home_club_id: string | null;
-    status: string;
     application_status: string;
     application_step: number;
     application_started_at: string | null;
@@ -52,25 +34,37 @@ export default async function IncompletePage() {
     reminder_count: number;
     created_at: string;
   };
-  const candidates = (leadsData ?? []) as Row[];
 
-  // Check application payloads to filter out anyone who did actually submit.
-  const ids = candidates.map((c) => c.id);
-  const { data: appsData } = ids.length
+  // Incomplete = an `applications` row with status='pending' whose payload
+  // has NOT actually been filled in. We start from `applications` (same
+  // entry point as /admin/applications) so we don't depend on
+  // `profiles.application_status` being correctly backfilled, then we
+  // hydrate the profile fields we need to display the row.
+  const [{ data: appsData }, cityMap, clubMap] = await Promise.all([
+    supabase
+      .from("applications")
+      .select("profile_id, payload, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+    getCityMap(),
+    getClubMap(),
+  ]);
+
+  const incompleteProfileIds = (appsData ?? [])
+    .filter((a) => isEmptyPayload(a.payload))
+    .map((a) => a.profile_id as string);
+
+  const { data: leadsData } = incompleteProfileIds.length
     ? await supabase
-        .from("applications")
-        .select("profile_id, payload")
-        .in("profile_id", ids)
-    : { data: [] as { profile_id: string; payload: Record<string, unknown> | null }[] };
-  const submittedIds = new Set(
-    (appsData ?? [])
-      .filter((a) => {
-        const p = a.payload as Record<string, unknown> | null;
-        return p !== null && Object.keys(p).length > 0;
-      })
-      .map((a) => a.profile_id as string),
-  );
-  const leads = candidates.filter((c) => !submittedIds.has(c.id));
+        .from("profiles")
+        .select(
+          "id, email, full_name, home_city_id, home_club_id, application_status, application_step, application_started_at, last_seen_at, reminder_sent_at, reminder_count, created_at",
+        )
+        .in("id", incompleteProfileIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as Row[] };
+
+  const leads = (leadsData ?? []) as Row[];
 
   /* ── Right-rail KPIs ── */
   const now = Date.now();
@@ -233,6 +227,30 @@ async function countSubmittedSince(days: number): Promise<number> {
     .select("id", { count: "exact", head: true })
     .gte("application_submitted_at", since);
   return count ?? 0;
+}
+
+/**
+ * The `applications.payload` JSONB starts at `'{}'::jsonb` (handle_new_user
+ * trigger). Anything other than a present, empty object means the wizard's
+ * submit ran. Defensive against null + the rare case where PostgREST hands
+ * back a raw JSON string instead of a parsed value.
+ */
+function isEmptyPayload(p: unknown): boolean {
+  if (p === null || p === undefined) return true;
+  if (typeof p === "object") return Object.keys(p as object).length === 0;
+  if (typeof p === "string") {
+    if (p === "" || p === "{}" || p === "null") return true;
+    try {
+      const parsed = JSON.parse(p);
+      return (
+        parsed === null ||
+        (typeof parsed === "object" && Object.keys(parsed).length === 0)
+      );
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 async function computeReminderResponse(): Promise<number> {
