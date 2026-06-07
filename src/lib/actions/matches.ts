@@ -100,7 +100,7 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
     cityId = (meCity as { home_city_id: string | null } | null)?.home_city_id ?? null;
   }
 
-  const { error } = await supabase.from("matches").insert({
+  const baseInsert = {
     season_id: season.id,
     author_id: user.id,
     opponent_id,
@@ -108,9 +108,23 @@ export async function logMatch(input: z.infer<typeof NewMatch>) {
     score: v.score || null,
     note: v.note || null,
     challenge_id: v.challenge_id,
-    city_id: cityId,
-  });
-  if (error) return { ok: false, error: error.message } as const;
+  };
+  let insertErr = (
+    await supabase.from("matches").insert({ ...baseInsert, city_id: cityId })
+  ).error;
+  // Retry without `city_id` if migration 0011_match_city hasn't been applied
+  // yet — keeps match logging working in production until the DDL lands.
+  if (
+    insertErr &&
+    /city_id/i.test(insertErr.message) &&
+    /schema cache|column .* (does not exist|of relation)/i.test(insertErr.message)
+  ) {
+    console.warn(
+      "[logMatch] retrying without city_id (migration 0011_match_city pending)",
+    );
+    insertErr = (await supabase.from("matches").insert(baseInsert)).error;
+  }
+  if (insertErr) return { ok: false, error: insertErr.message } as const;
 
   // Notify the opponent (best-effort)
   const [{ data: opponent }, { data: me }] = await Promise.all([
