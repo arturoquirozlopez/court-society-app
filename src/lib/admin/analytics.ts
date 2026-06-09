@@ -184,39 +184,36 @@ export async function getAnalyticsBundle(): Promise<AnalyticsBundle> {
   const monthStart = startOfMonth(now);
 
   // ── Single-round-trip loads ──
+  //
+  // `select("*")` everywhere instead of explicit columns so the dashboard
+  // doesn't go dark if a migration (0010 last_seen_at, 0011 matches.city_id,
+  // 0012 application_status, …) hasn't been applied yet — missing columns
+  // come back as `undefined`, never as a query error.
   const [
-    { data: profiles },
-    { data: matches },
-    { data: challenges },
-    { data: nominations },
-    { data: applications },
-    { data: visitingPlans },
+    { data: profiles, error: pErr },
+    { data: matches, error: mErr },
+    { data: challenges, error: cErr },
+    { data: nominations, error: nErr },
+    { data: applications, error: aErr },
+    { data: visitingPlans, error: vErr },
     { data: cities },
     { data: clubs },
   ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(
-        "id, full_name, status, home_city_id, home_club_id, joined_at, created_at, updated_at, last_seen_at",
-      ),
-    supabase
-      .from("matches")
-      .select(
-        "id, author_id, opponent_id, status, score, city_id, challenge_id, created_at, confirmed_at",
-      ),
-    supabase
-      .from("challenges")
-      .select(
-        "id, author_id, accepted_by, target_id, status, accepted_at, expires_at, created_at, city_id",
-      ),
-    supabase.from("nominations").select("id, nominator_id, status, applied_profile_id, created_at"),
-    supabase.from("applications").select("id, status, reviewed_at, created_at"),
-    supabase
-      .from("visiting_plans")
-      .select("id, profile_id, city_id, start_date, end_date, created_at"),
+    supabase.from("profiles").select("*"),
+    supabase.from("matches").select("*"),
+    supabase.from("challenges").select("*"),
+    supabase.from("nominations").select("*"),
+    supabase.from("applications").select("*"),
+    supabase.from("visiting_plans").select("*"),
     supabase.from("cities").select("id, name"),
     supabase.from("clubs").select("id, name, city_id"),
   ]);
+  if (pErr) console.error("[analytics] profiles load failed", pErr);
+  if (mErr) console.error("[analytics] matches load failed", mErr);
+  if (cErr) console.error("[analytics] challenges load failed", cErr);
+  if (nErr) console.error("[analytics] nominations load failed", nErr);
+  if (aErr) console.error("[analytics] applications load failed", aErr);
+  if (vErr) console.error("[analytics] visiting_plans load failed", vErr);
 
   type Profile = {
     id: string;
